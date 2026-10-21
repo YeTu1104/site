@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>复古像素作品集 UI - Retro Pixel Art Portfolio</title>
+  <link rel="stylesheet" href="styles.css?v=4">
+  <!-- TailwindCSS CDN for utility classes -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-900 m-0 p-0 overflow-hidden w-screen h-screen select-none font-mono">
+
+  <!-- Fixed 16:9 Viewport Container -->
+  <div id="app-viewport" class="app-viewport relative shadow-2xl">
+    
+    <!-- Background Image Layer -->
+    <!-- 【自己改】换背景图：把新图放进 assets 文件夹，然后把下面 src 引号里换成 "assets/你的图片名.png"（建议 16:9 比例） -->
+    <img id="bg-image" src="assets/bg-main.png" alt="Retro UI Background" class="absolute inset-0 w-full h-full object-fill pointer-events-none z-0" />
+
+    <!-- Debug Helper Overlay -->
+    <div id="debug-layer" class="absolute inset-0 pointer-events-none z-50 hidden">
+      <div id="debug-info" class="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded font-mono shadow z-50 pointer-events-auto">
+        DEBUG MODE ACTIVE | Mouse: <span id="debug-coords">0.0%, 0.0%</span>
+      </div>
+    </div>
+
+    <!-- Home (X) Button -->
+    <button id="btn-home" class="home-btn absolute z-30" aria-label="回到首页"></button>
+
+    <!-- Category Buttons (Left Navigation, Percentages matching instructions) -->
+    <!-- 【自己改】换按钮外观：按钮图片在 assets/ui 文件夹里，用同名新图覆盖即可（live2d/lihui/chahua/qban/juese/x.png） -->
+    <nav class="category-nav absolute z-20">
+      <button data-category="LIVE2D" class="category-btn category-btn-0 active cat-live2d" aria-label="LIVE2D"></button>
+      <button data-category="立绘" class="category-btn category-btn-1 cat-lihui" aria-label="立绘"></button>
+      <button data-category="插画" class="category-btn category-btn-2 cat-chahua" aria-label="插画"></button>
+      <button data-category="Q版" class="category-btn category-btn-3 cat-qban" aria-label="Q版"></button>
+      <button data-category="角色设计" class="category-btn category-btn-4 cat-juese" aria-label="角色设计"></button>
+    </nav>
+
+    <!-- Main White Canvas (Works Grid Viewport) -->
+    <main id="canvas-viewport" class="canvas-viewport absolute z-10 overflow-hidden bg-white">
+      <div id="works-grid" class="works-grid grid grid-cols-3 gap-3 p-3 transition-transform duration-75">
+        <!-- Dynamically Rendered Cards -->
+      </div>
+      <div id="empty-state" class="hidden absolute inset-0 flex flex-col items-center justify-center text-slate-500 font-bold">
+        <i data-lucide="folder-open" class="w-12 h-12 mb-2 text-slate-400"></i>
+        <span>暂无作品</span>
+      </div>
+    </main>
+
+    <!-- Retro Custom Vertical Scrollbar Area -->
+    <div id="custom-scrollbar" class="custom-scrollbar absolute z-20">
+      <!-- Up Arrow -->
+      <button id="scroll-arrow-up" class="scroll-arrow scroll-arrow-up flex items-center justify-center">
+        <div class="arrow-up-icon"></div>
+      </button>
+      <!-- Scroll Track -->
+      <div id="scroll-track" class="scroll-track relative">
+        <div class="dither-pattern-bg absolute inset-0"></div>
+        <!-- Dynamic Movable Thumb -->
+        <div id="scroll-thumb" class="scroll-thumb absolute left-0 right-0 cursor-grab active:cursor-grabbing">
+          <div class="thumb-grip"></div>
+        </div>
+      </div>
+      <!-- Down Arrow -->
+      <button id="scroll-arrow-down" class="scroll-arrow scroll-arrow-down flex items-center justify-center">
+        <div class="arrow-down-icon"></div>
+      </button>
+    </div>
+
+    <!-- Secret Half Frame Hotspot (25 consecutive clicks -> video) -->
+    <!-- 彩蛋画框：视频路径在 works.js 的 SECRET_VIDEO 里配置；连续点击次数在 app.js 搜 "secretCount >= 25" 可改 -->
+    <div id="secret-frame" class="secret-frame absolute z-20" aria-label="神秘画框"></div>
+
+  </div>
+
+  <!-- Lightbox Modal (For Fullsize Images / GIFs / MP4 Videos) -->
+  <div id="lightbox" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200">
+    <div class="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center flex-col">
+      <button id="lightbox-close" class="absolute -top-10 right-0 text-white hover:text-amber-300 text-sm flex items-center gap-1 bg-slate-800/80 px-3 py-1 rounded border border-slate-600">
+        <i data-lucide="x" class="w-4 h-4"></i> 关闭 (Esc)
+      </button>
+      <div id="lightbox-content" class="flex items-center justify-center">
+        <div id="lightbox-inner">
+          <!-- Image or Video dynamically inserted -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load works dataset -->
+  <script src="works.js?v=3"></script>
+  <!-- Main interaction script -->
+  <script type="module" src="app.js?v=4"></script>
+</body>
+</html>

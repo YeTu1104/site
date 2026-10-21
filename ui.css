@@ -1,0 +1,714 @@
+/* ===== 【第3轮新增】悬浮名称、气泡指针、四套弹窗主题、选项和跳转过渡 ===== */
+
+/*
+【文件说明】
+把本文件保存为 ui.css，与 index.html 放在同一文件夹。
+本文件只修改第 3 轮的交互 UI，不修改背景调整面板和 DEBUG 面板。
+所有字体均使用系统字体，不加载外部字体或外部库。
+
+【主题的读取顺序】
+1. interactions.js 中非空的 theme。
+2. map-data.js 对应区域的 ui。
+3. 当前四个区域按 id 使用各自备用主题。
+4. 其他未定义主题使用下面的通用颜色。
+
+【当前四套主题】
+PC_1_panel：电脑桌，蓝色。
+art_1_panel：作品集，暖金色。
+wyy_1_panel：歌单，紫色。
+
+【以后换成自己的图片】
+本文件暂时不加载任何图片，所有 UI 都用纯 CSS 绘制。
+每段相关样式前都写有替换图片的示例。
+示例在注释中，不会尝试加载尚未制作的文件。
+CSS 中 url("images/xxx.png") 的路径相对于本 ui.css 文件。
+
+【缺失文件时】
+如果本文件缺失，index.html 中的最简样式仍会提供弹窗、
+按钮、名称、气泡指针和淡出效果。
+*/
+
+
+/*
+一、通用主题参数和字体
+
+这些颜色只作用于弹窗、悬浮名称、气泡指针。
+修改 --interaction-accent 可以改变主题强调色；
+修改 --interaction-panel 可以改变弹窗底色；
+修改 --interaction-text 可以改变正文颜色。
+*/
+#ui-modal,
+#interaction-hover,
+#interaction-cursor {
+  --interaction-accent: #a9c8e8;
+  --interaction-border: #617c98;
+  --interaction-panel: #18222f;
+  --interaction-panel-top: #24374a;
+  --interaction-text: #e8eff7;
+  --interaction-muted: #b5c3d1;
+  --interaction-button: #25384b;
+  --interaction-button-hover: #324f69;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", sans-serif;
+}
+
+
+/*
+二、电脑桌主题
+
+map-data.js 的 ui 或 interactions.js 的 theme 使用：
+"PC_1_panel"
+
+以后如果只想给电脑桌换一张弹窗背景图，可以追加：
+#ui-modal[data-theme="PC_1_panel"] #modal-content {
+  background: #142232 url("images/pc-panel.png") center / cover no-repeat;
+}
+这里的图片路径只是写法示例，目前不会加载。
+*/
+#ui-modal[data-theme="PC_1_panel"],
+#interaction-hover[data-theme="PC_1_panel"],
+#interaction-cursor[data-theme="PC_1_panel"] {
+  --interaction-accent: #8ed6ff;
+  --interaction-border: #4c88af;
+  --interaction-panel: #142232;
+  --interaction-panel-top: #203d56;
+  --interaction-text: #e4f4ff;
+  --interaction-muted: #a9c7dc;
+  --interaction-button: #20394d;
+  --interaction-button-hover: #2c526f;
+}
+
+
+/*
+三、作品集主题
+
+使用主题名称："art_1_panel"。
+本段只换颜色，不改变弹窗布局和按钮功能。
+*/
+#ui-modal[data-theme="art_1_panel"],
+#interaction-hover[data-theme="art_1_panel"],
+#interaction-cursor[data-theme="art_1_panel"] {
+  --interaction-accent: #f2ce91;
+  --interaction-border: #a78556;
+  --interaction-panel: #2c251e;
+  --interaction-panel-top: #473728;
+  --interaction-text: #fff0dc;
+  --interaction-muted: #d4bda1;
+  --interaction-button: #423426;
+  --interaction-button-hover: #5b4630;
+}
+
+
+/*
+四、歌单主题
+
+使用主题名称："wyy_1_panel"。
+紫色主题不会自动播放音乐，仅用于歌单弹窗的外观。
+*/
+#ui-modal[data-theme="wyy_1_panel"],
+#interaction-hover[data-theme="wyy_1_panel"],
+#interaction-cursor[data-theme="wyy_1_panel"] {
+  --interaction-accent: #d4b3ff;
+  --interaction-border: #8970b3;
+  --interaction-panel: #251e35;
+  --interaction-panel-top: #3e3055;
+  --interaction-text: #f1eaff;
+  --interaction-muted: #c9b8df;
+  --interaction-button: #3b2e50;
+  --interaction-button-hover: #53416e;
+}
+
+
+/*
+六、悬浮名称
+
+名称位置由 index.html 根据鼠标位置计算，
+本段只负责背景、边框、文字和阴影。
+pointer-events: none 很重要：名称不能挡住场景的点击。
+
+以后替换名称背景图片的写法：
+#interaction-hover {
+  background: transparent url("images/name-label.png") center / 100% 100% no-repeat;
+  border: 0;
+  padding: 10px 16px;
+}
+
+如果图片自带边框，可删除下面的 box-shadow。
+如果图片自带尖角，也可以隐藏下一段的 ::after。
+*/
+#interaction-hover {
+  position: fixed;
+  z-index: 50;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 8px 12px;
+  border: 2px solid var(--interaction-border);
+  border-radius: 3px;
+  background: var(--interaction-panel);
+  color: var(--interaction-text);
+  box-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* 名称旁边的小尖角，使用旋转方块绘制，不依赖图片。 */
+#interaction-hover::after {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 10px;
+  width: 7px;
+  height: 7px;
+  border-left: 2px solid var(--interaction-border);
+  border-bottom: 2px solid var(--interaction-border);
+  background: var(--interaction-panel);
+  transform: rotate(45deg);
+}
+
+
+/*
+七、纯 CSS 气泡鼠标指针
+
+鼠标在触发点上时，隐藏原生指针，
+用跟随鼠标的小气泡代替；离开触发点恢复十字指针。
+没有使用外部光标图片，也没有生成占位图片。
+
+以后改成自己的 PNG 光标，有两种方式，选择一种即可。
+
+方式 A：继续使用当前跟随鼠标的元素，只换背景图片。
+#interaction-cursor {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent url("images/bubble-cursor.png") center / contain no-repeat;
+}
+#interaction-cursor::before,
+#interaction-cursor::after {
+  display: none;
+}
+
+方式 B：使用浏览器原生图片光标，并隐藏 CSS 气泡。
+#gameCanvas.interaction-hovering {
+  cursor: url("images/bubble-cursor.png") 2 2, pointer !important;
+}
+#interaction-cursor {
+  display: none !important;
+}
+
+方式 B 中的 2 2 是光标点击位置，也叫热点，可按素材调整。
+建议光标素材大小为 32×32 像素。
+*/
+#gameCanvas.interaction-hovering {
+  cursor: none !important;
+}
+
+#interaction-cursor {
+  position: fixed;
+  z-index: 51;
+  width: 25px;
+  height: 20px;
+  border: 2px solid var(--interaction-panel);
+  border-radius: 5px;
+  background: var(--interaction-accent);
+  color: var(--interaction-panel);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+/* 气泡下方的小尾巴。换成自制图片时可以隐藏。 */
+#interaction-cursor::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  bottom: -5px;
+  width: 6px;
+  height: 6px;
+  border-left: 2px solid var(--interaction-panel);
+  border-bottom: 2px solid var(--interaction-panel);
+  background: var(--interaction-accent);
+  transform: skewY(-30deg);
+}
+
+/* 气泡里的三个点。字体仍然来自系统，不加载字体文件。 */
+#interaction-cursor::after {
+  content: "···";
+  position: absolute;
+  inset: -5px 0 0;
+  color: var(--interaction-panel);
+  text-align: center;
+  font: bold 18px/18px -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+
+/*
+八、弹窗遮罩
+
+background 控制背景变暗的程度，0.62 越大越暗。
+blur(3px) 控制轻微模糊；只模糊弹窗背后的场景。
+弹窗本身和按钮不会变模糊。
+不支持 backdrop-filter 的旧浏览器仍然会显示变暗遮罩。
+*/
+#ui-modal {
+  padding: 20px;
+  background: rgba(5, 9, 14, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+
+/*
+九、弹窗主体
+
+width 决定弹窗宽度。
+max-height 限制最高高度，选项很多时在弹窗内部滚动。
+边框和硬阴影营造像素风格，不使用场景特效。
+
+以后替换弹窗背景图片的写法：
+#modal-content {
+  background: #18222f url("images/panel-background.png") center / cover no-repeat;
+}
+
+以后替换边框图片的写法：
+#modal-content {
+  border: 16px solid transparent;
+  border-image: url("images/panel-border.png") 16 fill / 16px / 0 stretch;
+}
+
+border-image 的 16 是素材边缘切片尺寸，要根据你的图片修改。
+如果图片边框占用空间较大，也要调整 padding。
+*/
+#modal-content {
+  width: min(520px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 24px;
+  border: 3px solid var(--interaction-border);
+  border-radius: 4px;
+  background: linear-gradient(
+    160deg,
+    var(--interaction-panel-top),
+    var(--interaction-panel) 58%
+  );
+  color: var(--interaction-text);
+  box-shadow:
+    7px 7px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: interaction-modal-in 0.22s ease-out both;
+  scrollbar-width: thin;
+  scrollbar-color: var(--interaction-border) var(--interaction-panel);
+}
+
+
+/*
+十、标题栏和关闭按钮
+
+保留原来的 modal-header、modal-title、modal-close，
+没有重新命名或替换原有元素。
+*/
+#modal-header {
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--interaction-border);
+}
+
+#modal-title {
+  margin: 0;
+  color: var(--interaction-accent);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+/*
+右上角关闭按钮。
+以后如果想换关闭按钮图片，可以设置 background-image；
+保留按钮中的 × 也能保证图片未加载时仍然可辨认。
+*/
+#modal-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--interaction-border);
+  border-radius: 2px;
+  background: var(--interaction-button);
+  color: var(--interaction-text);
+  font-family: inherit;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#modal-close:hover {
+  background: var(--interaction-button-hover);
+  color: var(--interaction-accent);
+}
+
+/* 键盘焦点外框：方便使用 Tab 和 Enter 选择按钮。 */
+#modal-close:focus-visible,
+#modal-body .interaction-option:focus-visible {
+  outline: 2px solid var(--interaction-accent);
+  outline-offset: 3px;
+}
+
+
+/*
+十一、正文和可选插图
+
+说明文字来自 interactions.js 的 text。
+white-space: pre-wrap 保留配置文字中的换行。
+插图来自 interactions.js 的 image；为空时不创建图片元素。
+*/
+#modal-body {
+  color: var(--interaction-text);
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+#modal-body .interaction-text {
+  margin: 0 0 20px;
+  color: var(--interaction-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#modal-body .interaction-image {
+  display: block;
+  max-width: 100%;
+  max-height: 40vh;
+  margin: 0 auto 20px;
+  border: 1px solid var(--interaction-border);
+  border-radius: 2px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/*
+如果以后插图不是像素画，而是照片或普通绘画，
+可以把上一段的 image-rendering: pixelated;
+改成 image-rendering: auto;。
+*/
+
+
+/*
+十二、选项列表和按钮
+
+所有选项纵向排列，数量不限。
+选项过多时由弹窗主体滚动，不会把关闭按钮挤出页面外。
+
+以后替换按钮背景图片的写法：
+#modal-body .interaction-option {
+  background: transparent url("images/button-normal.png") center / 100% 100% no-repeat;
+  border-color: transparent;
+}
+#modal-body .interaction-option:hover:not(:disabled) {
+  background: transparent url("images/button-hover.png") center / 100% 100% no-repeat;
+}
+
+如果按钮图片自带完整边框和阴影，可将 border、box-shadow 设为 none。
+文字仍然来自 interactions.js 中的 label，不需要画进图片。
+*/
+#modal-body .interaction-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#modal-body .interaction-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 14px;
+  border: 2px solid var(--interaction-border);
+  border-radius: 3px;
+  background: var(--interaction-button);
+  color: var(--interaction-text);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.25);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.12s ease;
+}
+
+/* 按钮主文字允许在窄窗口换行，不挤出弹窗。 */
+#modal-body .interaction-option > span:first-child {
+  min-width: 0;
+}
+
+/* 鼠标悬停：提亮背景和边框。禁用选项不会触发此效果。 */
+#modal-body .interaction-option:hover:not(:disabled) {
+  border-color: var(--interaction-accent);
+  background: var(--interaction-button-hover);
+  color: var(--interaction-accent);
+  transform: translateY(-1px);
+}
+
+/* 点击按下：轻微下沉，提供清晰的按钮反馈。 */
+#modal-body .interaction-option:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+
+/*
+十三、“敬请期待”状态
+
+url 为空且不是 action: "close" 的选项会被真正禁用，
+不是仅仅改变颜色，因此鼠标和键盘都不能触发跳转。
+
+以后可以给禁用按钮单独准备图片：
+#modal-body .interaction-option:disabled {
+  background: #30343a url("images/button-disabled.png") center / 100% 100% no-repeat;
+}
+*/
+#modal-body .interaction-option:disabled {
+  border-color: #545960;
+  background: #30343a;
+  color: #969ba3;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+#modal-body .interaction-option-note {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid #656a72;
+  border-radius: 2px;
+  color: #b5bac2;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+
+/*
+十四、链接错误或新标签页被阻止时的提示
+
+提示显示在选项下方，不使用浏览器弹出警告，
+也不会清空场景或覆盖 DEBUG 面板。
+*/
+#modal-body .interaction-feedback {
+  margin: 16px 0 0;
+  color: #ffc1a8;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+
+/*
+十五、跳转淡出
+
+点击有效链接后添加 is-active，使整个窗口在 0.4 秒内变黑。
+index.html 同样等待 400 毫秒后再跳转。
+如果以后修改时长，需要同步修改 CSS 的 0.4s
+和 index.html 中 navigateInteraction 内的 400。
+
+这里是页面切换过渡，不是第 4 轮的场景视觉特效。
+pointer-events 在淡出期间阻止重复点击。
+*/
+#interaction-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+#interaction-transition.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+
+/*
+十六、打开弹窗的淡入和轻微放大
+
+从 96% 大小变成 100%，同时由透明变为可见。
+只在弹窗打开时播放，不改变角色或背景的尺寸。
+*/
+@keyframes interaction-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
+/*
+十七、小窗口下的弹窗间距
+
+只调整交互弹窗，不修改背景调整面板的位置、宽度和快捷键。
+*/
+@media (max-width: 480px) {
+  #ui-modal {
+    padding: 14px;
+  }
+
+  #modal-content {
+    padding: 18px;
+    max-height: 88vh;
+  }
+
+  #modal-title {
+    font-size: 18px;
+  }
+
+  #modal-body {
+    font-size: 14px;
+  }
+
+  #modal-body .interaction-option {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+}
+
+/* ===== 【第3轮新增】结束 ===== */
+
+/* ===== 【第5轮新增】歌单黑胶唱片遮罩 ===== */
+
+/*
+十七、歌单黑胶唱片遮罩
+
+点击歌单区域后整个页面变暗，中央显示 LIUSHENGJI.png 的黑胶唱片；
+唱片周围有若干音乐符号左右晃动。
+点唱片本体会在新标签页打开音乐网站；点空白区域关闭遮罩。
+*/
+#music-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 10, 0.82);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  cursor: pointer;
+}
+
+/* 带 hidden 时强制隐藏，避免上面的 display: flex 覆盖浏览器的隐藏规则。 */
+#music-overlay[hidden] {
+  display: none;
+}
+
+#music-stage {
+  position: relative;
+  width: min(92vw, 460px);
+  height: min(92vw, 460px);
+}
+
+#music-vinyl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+#music-notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.music-note {
+  position: absolute;
+  color: #d4b3ff;
+  font-size: 28px;
+  text-shadow: 0 0 8px rgba(212, 179, 255, 0.9);
+  transform: translate(-50%, -50%);
+  animation: music-wobble 1.6s ease-in-out infinite;
+}
+
+@keyframes music-wobble {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(-12deg) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(12deg) translateY(-8px);
+  }
+}
+
+/* ===== 【第5轮新增】结束 ===== */
+
+/* ===== 【第6轮新增】开场黑屏遮罩 ===== */
+
+/*
+十八、开场黑屏遮罩
+
+页面点开时先全黑，播放两声敲门声后，黑色从中间向左右两侧
+滑开并淡出。遮罩本身不拦截鼠标，动画结束后彻底隐藏。
+*/
+#intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.intro-half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background: #000000;
+  transition: transform 0.9s ease-in-out, opacity 0.9s ease-in-out;
+}
+
+.intro-left {
+  left: 0;
+}
+
+.intro-right {
+  right: 0;
+}
+
+#intro-overlay.is-revealing .intro-left {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+#intro-overlay.is-revealing .intro-right {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+#intro-overlay.is-hidden {
+  display: none;
+}
+
+/* ===== 【第6轮新增】结束 ===== */

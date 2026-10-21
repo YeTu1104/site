@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作品集可视化管理工作台</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#141d2e; --panel2:#101828; --line:#26334d;
+    --text:#e6edf7; --muted:#8b98ad; --accent:#38bdf8; --accent2:#22d3ee;
+    --ok:#34d399; --warn:#fbbf24; --danger:#f87171;
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg); color:var(--text); height:100vh; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  button{font-family:inherit;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:#2a3a57;border-radius:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* top bar */
+  .topbar{
+    flex:none; display:flex; align-items:center; gap:12px; padding:10px 16px;
+    border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap;
+  }
+  .topbar .logo{display:flex; align-items:center; gap:10px;}
+  .topbar .logo .dot{width:12px;height:12px;border-radius:3px;background:var(--accent);box-shadow:0 0 10px var(--accent);}
+  .topbar h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px;}
+  .topbar .sub{font-size:12px;color:var(--muted);}
+  .spacer{flex:1;}
+  .btn{
+    border:1px solid var(--line); background:#0b1420; color:var(--text);
+    padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;
+    display:inline-flex; align-items:center; gap:6px; transition:.15s; white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn.primary{background:linear-gradient(135deg,#0284c7,#0ea5e9); border-color:#0ea5e9; color:#fff; font-weight:600;}
+  .btn.primary:hover{filter:brightness(1.08);}
+  .btn.ok{background:linear-gradient(135deg,#059669,#10b981); border-color:#10b981; color:#fff; font-weight:600;}
+  .btn.ok:hover{filter:brightness(1.08);}
+  .btn.dim{color:var(--muted);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+
+  /* layout */
+  .layout{flex:1; display:grid; grid-template-columns:300px 1fr; min-height:0;}
+  @media (max-width:860px){
+    body{overflow:auto;}
+    .layout{grid-template-columns:1fr; grid-template-rows:auto auto; min-height:0;}
+  }
+
+  /* left: categories + list */
+  .side{
+    background:var(--panel2); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .cats{padding:12px 12px 8px; display:flex; flex-direction:column; gap:6px;}
+  .cats .cats-title{font-size:12px; color:var(--muted); margin-bottom:2px;}
+  .cat-tab{
+    display:flex; align-items:center; gap:10px; padding:10px 12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    cursor:pointer; transition:.12s; font-size:14px; color:var(--text);
+  }
+  .cat-tab .swatch{width:14px;height:14px;border-radius:4px;flex:none;}
+  .cat-tab .cnt{margin-left:auto; font-size:12px; color:var(--muted); background:#0b1420; padding:1px 8px; border-radius:10px;}
+  .cat-tab:hover{border-color:var(--accent);}
+  .cat-tab.active{border-color:var(--accent); background:#12263b; box-shadow:0 0 0 1px var(--accent);}
+  .cat-tab.active .catname{color:#fff;}
+
+  .list-head{
+    display:flex; align-items:center; padding:14px 12px 8px; font-size:12px; color:var(--muted);
+    border-top:1px solid var(--line); margin-top:6px;
+  }
+  .list-head .lock{color:var(--accent2); font-size:11px; margin-left:auto;}
+  .add-btn{margin:0 12px 10px;}
+  .add-btn .btn{width:100%; justify-content:center; border-style:dashed;}
+
+  .list{flex:1; overflow-y:auto; padding:0 12px 14px;}
+  .work-item{
+    display:flex; gap:10px; align-items:center; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; padding:8px; margin-bottom:8px;
+    cursor:pointer; transition:.12s; position:relative;
+  }
+  .work-item.selected{border-color:var(--accent); background:#12263b;}
+  .work-item .thumb{
+    width:60px;height:45px;flex:none;border-radius:6px;overflow:hidden;
+    background:#0b1420;border:1px solid var(--line); display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:10px; position:relative;
+  }
+  .work-item .thumb img,.work-item .thumb video{width:100%;height:100%;object-fit:cover;}
+  .work-item .thumb .ph{font-size:18px;color:var(--muted);}
+  .work-item .info{flex:1;min-width:0;}
+  .work-item .info .no{font-size:11px;color:var(--accent2);font-weight:600;}
+  .work-item .info .nm{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+  .work-item .info .sfx{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .work-item .badge{font-size:9px;position:absolute;top:6px;left:6px;background:var(--ok);color:#04210f;padding:0 5px;border-radius:4px;font-weight:700;}
+
+  /* right editor */
+  .editor{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg);}
+  .editor-scroll{flex:1;overflow-y:auto;padding:20px 24px 40px;min-width:0;}
+  .ed-head{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+  .ed-head .cat-chip{
+    font-size:13px;font-weight:700;padding:5px 12px;border-radius:8px;border:1px solid var(--line);
+    display:inline-flex;align-items:center;gap:8px;background:var(--panel);
+  }
+  .ed-head .cat-chip .sw{width:11px;height:11px;border-radius:3px;}
+  .ed-head .hint{font-size:12px;color:var(--muted);}
+  .lock-tag{font-size:11px;color:var(--accent2);border:1px solid var(--accent2);padding:2px 8px;border-radius:20px;}
+
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .field label b{color:var(--text);}
+  .field input[type=text],.field textarea{
+    width:100%; background:#0b1420; color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:9px 12px; font-size:14px; font-family:inherit;
+  }
+  .field textarea{resize:vertical; min-height:54px;}
+
+  .field .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .field .num-in{width:110px; text-align:center;}
+
+  /* slot card */
+  .slot-card{
+    border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--panel);
+    display:grid; grid-template-columns:200px 1fr; gap:16px; align-items:start;
+  }
+  @media (max-width:720px){ .slot-card{grid-template-columns:1fr;} }
+  .slot-card .prev{
+    width:200px; aspect-ratio:4/3; border-radius:8px; overflow:hidden;
+    background:#0b1420; border:1px solid var(--line); display:flex;align-items:center;justify-content:center;
+    color:var(--muted); font-size:13px; position:relative;
+  }
+  .slot-card .prev img,.slot-card .prev video{width:100%;height:100%;object-fit:contain;}
+  .slot-card .prev.full-prev{aspect-ratio:16/10;}
+  .slot-card .prev .lab{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.6);font-size:10px;padding:2px 6px;border-radius:5px;color:var(--text);}
+  .slot-card .body{min-width:0;}
+  .slot-card .body .pname{font-size:12px;color:var(--muted);margin-bottom:10px;word-break:break-all;font-family:monospace;}
+  .slot-card .body .acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .slot-card .body .acts .btn{font-size:12px;padding:7px 12px;}
+  .slot-card .body .note2{font-size:11px;color:var(--muted);line-height:1.5;}
+
+  .divider{height:1px;background:var(--line);margin:20px 0;}
+
+  /* empty editor */
+  .empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:12px;font-size:14px;}
+
+  /* ---------- modal overlay ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(5,9,18,.72); backdrop-filter:blur(3px);
+    z-index:100; display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    width:min(960px,96vw); max-height:92vh; display:flex; flex-direction:column;
+    box-shadow:0 20px 60px rgba(0,0,0,.55); overflow:hidden;
+  }
+  .modal .m-head{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);}
+  .modal .m-head h2{font-size:15px;margin:0;font-weight:600;}
+  .modal .m-head .x{margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
+  .modal .m-head .x:hover{color:var(--danger);}
+  .modal .m-body{padding:18px;overflow:auto;}
+
+  /* cropper modal */
+  #cropOverlay{background:rgba(3,6,12,.92);}
+  #cropOverlay .crop-wrap{width:min(960px,96vw); height:min(84vh,680px); display:flex; flex-direction:column;}
+  #cropOverlay .crop-stage{flex:1; min-height:0; position:relative; background:#05080f; border-radius:10px; overflow:hidden;}
+  canvas#cropCanvas{position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; touch-action:none;}
+  #cropOverlay .crop-bar{display:flex; align-items:center; gap:12px; padding:12px 4px 0;}
+  #cropOverlay .crop-bar .info{font-size:12px;color:var(--muted);}
+  #cropOverlay .crop-bar .spacer{flex:1;}
+  #cropOverlay .crop-preview{width:120px;height:90px;flex:none;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:
+    repeating-conic-gradient(#334155 0 25%, #1e293b 0 50%) 0/16px 16px;}
+  #cropOverlay .crop-preview canvas{display:block;}
+
+  /* export modal */
+  #exportCode{width:100%;height:300px;background:#0b1420;color:#d7e2f2;border:1px solid var(--line);
+    border-radius:10px;padding:12px;font-family:monospace;font-size:12px;resize:vertical;line-height:1.5;}
+
+  /* import modal */
+  #importText{width:100%;height:240px;background:#0b1420;color:#d7e2f2;border:1px solid var(--line);
+    border-radius:10px;padding:12px;font-family:monospace;font-size:12px;resize:vertical;line-height:1.5;}
+
+  .toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+    background:#0b1420; border:1px solid var(--accent); color:var(--text);
+    padding:11px 20px; border-radius:10px; font-size:13px; z-index:200;
+    box-shadow:0 6px 24px rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:.2s;
+    max-width:82vw;
+  }
+  .toast.show{opacity:1;}
+  .toast.err{border-color:var(--danger);}
+  .toast.ok{border-color:var(--ok);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <span class="dot"></span>
+    <div>
+      <h1>作品集管理工作台</h1>
+      <div class="sub">分分类维护作品 · 4:3 缩略图裁剪 · 视频导入 · 一键生成代码和文件</div>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <button class="btn" onclick="WB.openImport()">📥 导入当前 works.js</button>
+  <button class="btn dim" onclick="WB.reloadWorks()" title="重新从同目录 works.js 读取">🔄 重新读取 works.js</button>
+  <button class="btn primary" onclick="WB.openExport()">⬇ 导出更新包</button>
+</div>
+
+<div class="layout">
+  <!-- left -->
+  <aside class="side">
+    <div class="cats">
+      <div class="cats-title">作品分类（每个分类各自独立）</div>
+      <div id="catList"></div>
+    </div>
+    <div class="list-head">
+      <span>当前分类作品</span>
+      <span class="lock">🔒 已锁定到左侧分类</span>
+    </div>
+    <div class="add-btn"><button class="btn" onclick="WB.addWork()">＋ 在当前分类添加新作品</button></div>
+    <div class="list" id="workList"></div>
+  </aside>
+
+  <!-- right editor -->
+  <section class="editor">
+    <div id="editorEmpty" class="empty">
+      <div style="font-size:40px">🖼️</div>
+      <div>先点左侧分类和作品，或点「在当前分类添加新作品」</div>
+    </div>
+    <div id="editorBody" class="editor-scroll" style="display:none"></div>
+  </section>
+</div>
+
+<!-- crop modal -->
+<div class="modal-overlay" id="cropOverlay">
+  <div class="crop-wrap">
+    <div class="crop-stage">
+      <canvas id="cropCanvas"></canvas>
+    </div>
+    <div class="crop-bar">
+      <span class="info">拖动裁剪框移动 · 拖角/边调整 · 比例固定 <b style="color:var(--accent2)">4:3</b></span>
+      <span class="spacer"></span>
+      <div class="crop-preview"><canvas id="cropPreview" width="120" height="90"></canvas></div>
+      <button class="btn" onclick="WB.cropCancel()">取消</button>
+      <button class="btn ok" onclick="WB.cropApply()">✓ 使用这张缩略图</button>
+    </div>
+  </div>
+</div>
+
+<!-- export modal -->
+<div class="modal-overlay" id="exportOverlay">
+  <div class="modal">
+    <div class="m-head"><h2>导出作品集更新</h2><button class="x" onclick="WB.closeExport()">✕</button></div>
+    <div class="m-body">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">
+        下面是完整的新 <b style="color:var(--text)">works.js</b> 内容。你可以：<br>
+        ① 点「下载更新包」得到一个 zip（含新图片/视频 + 新的 works.js + 使用说明），解压到项目根目录即可。<br>
+        ② 或点「复制代码」后手动粘贴替换 works.js，再把新文件拖进对应 assets 文件夹。
+      </p>
+      <textarea id="exportCode" readonly spellcheck="false"></textarea>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+        <button class="btn ok" onclick="WB.downloadZip()">⬇ 下载更新包 (.zip)</button>
+        <button class="btn primary" onclick="WB.copyCode()">📋 复制 works.js 代码</button>
+        <span id="exportStat" style="align-self:center;font-size:12px;color:var(--muted);"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- import modal -->
+<div class="modal-overlay" id="importOverlay">
+  <div class="modal">
+    <div class="m-head"><h2>导入当前 works.js</h2><button class="x" onclick="WB.closeImport()">✕</button></div>
+    <div class="m-body">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">
+        把你项目里现在的 <b style="color:var(--text)">works.js</b> 文件内容粘贴到下面，或直接选择文件，点击导入即可同步进工作台（不会丢失你已有的作品）。
+      </p>
+      <input type="file" id="importFileInput" accept=".js" style="display:none">
+      <button class="btn" style="margin-bottom:10px;" onclick="document.getElementById('importFileInput').click()">📂 选择 works.js 文件</button>
+      <textarea id="importText" spellcheck="false" placeholder="把 works.js 的内容粘贴到这里…"></textarea>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button class="btn ok" onclick="WB.doImport()">✓ 导入</button>
+        <button class="btn" onclick="WB.closeImport()">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- hidden inputs -->
+<input type="file" id="inFullImg" accept="image/*" style="display:none">
+<input type="file" id="inFullVideo" accept="video/*" style="display:none">
+<input type="file" id="inThumb" accept="image/*" style="display:none">
+
+<script src="works.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* =======================================================================
+ *  作品集管理工作台 —— 单文件离线工具
+ *  数据模型：
+ *    state.items = [ { id, cat, num, note, thumb:slot, full:slot }, ... ]
+ *    slot = {
+ *      kind: 'placeholder'  -> { text, bg, fg, preview }
+ *      kind: 'file'         -> { video, blob, ext, path, preview, auto }
+ *    }
+ * ======================================================================= */
+
+const CATEGORIES = ["LIVE2D","立绘","插画","Q版","角色设计"];
+const CAT_COLORS = {
+  "LIVE2D":"#38bdf8", "立绘":"#f472b6", "插画":"#34d399", "Q版":"#fb7185", "角色设计":"#fbbf24"
+};
+const THUMB_W = 800, THUMB_H = 600;   // 缩略图固定输出 4:3
+
+const $ = (s)=>document.querySelector(s);
+const toastEl = $('#toast');
+let toastTimer = null;
+function toast(msg, type){
+  toastEl.textContent = msg;
+  toastEl.className = 'toast show' + (type==='err'?' err':(type==='ok'?' ok':''));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toastEl.className='toast', 3000);
+}
+
+let uid = 0;
+function newId(){ return 'w' + (++uid) + '_' + Date.now().toString(36); }
+
+/* ---------- 占位图 ---------- */
+function generatePlaceholder(text, bgColor, textColor){
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">' +
+    '<rect width="400" height="300" fill="'+bgColor+'"/>' +
+    '<pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse">' +
+    '<path d="M 20 0 L 0 0 0 20" fill="none" stroke="'+textColor+'" stroke-width="0.5" opacity="0.15"/></pattern>' +
+    '<rect width="400" height="300" fill="url(#g)"/>' +
+    '<circle cx="200" cy="130" r="45" fill="none" stroke="'+textColor+'" stroke-width="3"/>' +
+    '<text x="200" y="135" font-family="monospace" font-size="20" font-weight="bold" fill="'+textColor+'" text-anchor="middle" dominant-baseline="middle">'+text+'</text>' +
+    '<text x="200" y="220" font-family="sans-serif" font-size="12" fill="'+textColor+'" opacity="0.7" text-anchor="middle">点击查看详情</text>' +
+  '</svg>';
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+function decodePlaceholder(dataUrl){
+  const enc = dataUrl.slice(dataUrl.indexOf(',')+1);
+  let svg = enc;
+  try { svg = decodeURIComponent(enc); } catch(e){}
+  const mText = /<text x="200" y="135"[^>]*>([^<]*)<\/text>/.exec(svg);
+  const mBg = /fill="(#[0-9A-Fa-f]{3,8})"/.exec(svg);
+  const mFg = /<circle[^>]*stroke="(#[0-9A-Fa-f]{3,8})"/.exec(svg);
+  return {
+    text: mText ? mText[1] : '作品',
+    bg: mBg ? mBg[1] : '#1E293B',
+    fg: mFg ? mFg[1] : '#38BDF8'
+  };
+}
+function makePlaceholder(text, bg, fg){
+  return { kind:'placeholder', text, bg, fg, preview: generatePlaceholder(text,bg,fg), video:false, blob:null, ext:'', path:'', auto:false };
+}
+function makeFile(path, video){
+  return { kind:'file', video:!!video, blob:null, ext:'', path:path||'', auto:false, preview:'' };
+}
+
+/* ---------- 内置换初始作品数据（与当前 works.js 一致） ---------- */
+function buildDefaultWorks(){
+  return {
+    "LIVE2D": [
+      { thumb:"assets/live2d/s1.png", full:"assets/live2d/1.jpg", note:"LIVE2D 作品 #01 的注释文字（在这里修改）" },
+      { thumb:"assets/live2d/suolue-02.jpg", full:"assets/live2d/02.jpg", note:"LIVE2D 作品 #02 的注释文字（在这里修改）" },
+      { thumb:generatePlaceholder("LIVE2D #03","#1E293B","#38BDF8"), full:generatePlaceholder("LIVE2D 模型展示 #03","#0F172A","#38BDF8"), note:"LIVE2D 作品 #03 的注释文字（在这里修改）" },
+      { thumb:generatePlaceholder("LIVE2D #04","#1E293B","#38BDF8"), full:generatePlaceholder("LIVE2D 模型展示 #04","#0F172A","#38BDF8"), note:"LIVE2D 作品 #04 的注释文字（在这里修改）" },
+      { thumb:"assets/live2d/suolue-05.png", full:"assets/live2d/05.mp4", note:"模型师：缘青青青" },
+      { thumb:generatePlaceholder("LIVE2D #06","#1E293B","#38BDF8"), full:generatePlaceholder("LIVE2D 模型展示 #06","#0F172A","#38BDF8"), note:"LIVE2D 作品 #06 的注释文字（在这里修改）" },
+      { thumb:generatePlaceholder("LIVE2D #07","#1E293B","#38BDF8"), full:generatePlaceholder("LIVE2D 模型展示 #07","#0F172A","#38BDF8"), note:"LIVE2D 作品 #07 的注释文字（在这里修改）" },
+      { thumb:generatePlaceholder("LIVE2D #08","#1E293B","#38BDF8"), full:generatePlaceholder("LIVE2D 模型展示 #08","#0F172A","#38BDF8"), note:"LIVE2D 作品 #08 的注释文字（在这里修改）" }
+    ],
+    "立绘": [
+      { thumb:"assets/立绘/suolue-1.png", full:"assets/立绘/1.png" },
+      { thumb:"assets/立绘/suolue-2.png", full:"assets/立绘/2.png" },
+      { thumb:"assets/立绘/suolue-3.png", full:"assets/立绘/3.png" },
+      { thumb:"assets/立绘/suolue-4.png", full:"assets/立绘/4.png" },
+      { thumb:"assets/立绘/suolue-5.png", full:"assets/立绘/5.png" }
+    ],
+    "插画": [
+      { thumb:generatePlaceholder("像素插画 #01","#064E3B","#34D399"), full:generatePlaceholder("像素城市场景插画","#022C22","#34D399") },
+      { thumb:generatePlaceholder("像素插画 #02","#064E3B","#34D399"), full:generatePlaceholder("星空夜景主题插画","#022C22","#34D399") },
+      { thumb:generatePlaceholder("像素插画 #03","#064E3B","#34D399"), full:generatePlaceholder("夏日海滩概念插画","#022C22","#34D399") }
+    ],
+    "Q版": [
+      { thumb:generatePlaceholder("Q版作品 #01","#831843","#F472B6"), full:generatePlaceholder("Q版小人全身 #01","#500724","#F472B6") },
+      { thumb:generatePlaceholder("Q版作品 #02","#831843","#F472B6"), full:generatePlaceholder("Q版小人全身 #02","#500724","#F472B6") }
+    ],
+    "角色设计": [
+      { thumb:generatePlaceholder("角色设定 #01","#78350F","#FBBF24"), full:generatePlaceholder("角色设计三视图 #01","#451A03","#FBBF24") },
+      { thumb:generatePlaceholder("角色设定 #02","#78350F","#FBBF24"), full:generatePlaceholder("武器与装备设定稿 #02","#451A03","#FBBF24") }
+    ]
+  };
+}
+
+function slotFromValue(v){
+  if(typeof v === 'string' && v.indexOf('data:image/svg+xml') === 0){
+    const d = decodePlaceholder(v);
+    return makePlaceholder(d.text, d.bg, d.fg);
+  }
+  return makeFile(v||'', /\.mp4$/i.test(v||''));
+}
+
+function loadFromWorks(worksObj){
+  const items = [];
+  CATEGORIES.forEach(cat => {
+    const arr = (worksObj && worksObj[cat]) || [];
+    arr.forEach((w, i) => {
+      items.push({
+        id: newId(),
+        cat,
+        num: String(i+1).padStart(2,'0'),
+        note: (typeof w.note === 'string') ? w.note : '',
+        thumb: slotFromValue(w.thumb),
+        full: slotFromValue(w.full),
+      });
+    });
+  });
+  return items;
+}
+
+/* ---------- 读取同目录 works.js（通过 <script src="works.js"> 已加载为全局 WORKS）---------- */
+function detectExternalWorks(){
+  try {
+    if(typeof WORKS !== 'undefined' && WORKS && typeof WORKS === 'object'){
+      const cfg = {
+        DEBUG: (typeof DEBUG !== 'undefined') ? DEBUG : false,
+        HOME_URL: (typeof HOME_URL !== 'undefined') ? HOME_URL : 'index.html',
+        SECRET_VIDEO: (typeof SECRET_VIDEO !== 'undefined') ? SECRET_VIDEO : 'assets/Never Gonna Give You Up-h264.mp4'
+      };
+      return { works: WORKS, cfg: cfg, source: 'file' };
+    }
+  } catch(e){}
+  return { works: buildDefaultWorks(), cfg: { DEBUG:false, HOME_URL:'index.html', SECRET_VIDEO:'assets/Never Gonna Give You Up-h264.mp4' }, source: 'default' };
+}
+
+/* ---------- 全局状态 ---------- */
+const _ext = detectExternalWorks();
+const state = {
+  items: loadFromWorks(_ext.works),
+  activeCat: "LIVE2D",
+  selectedId: null,
+  config: _ext.cfg
+};
+
+function getCatItems(cat){ return state.items.filter(it => it.cat === cat); }
+function getItem(id){ return state.items.find(it => it.id === id); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function extOf(name){ const m=/\.([a-z0-9]+)$/i.exec(name||''); return m?m[1].toLowerCase():'png'; }
+
+/* ---------- slot path ---------- */
+function slotPath(item, slot, isThumb){
+  if(slot.kind === 'placeholder') return '';
+  return slot.path || (isThumb ? `assets/${item.cat}/suolue-${item.num}.${slot.ext}` : `assets/${item.cat}/${item.num}.${slot.ext}`);
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  if(!state.selectedId || !getItem(state.selectedId)){
+    if(state.selectedId && !getItem(state.selectedId)) state.selectedId = null;
+  }
+  renderCats();
+  renderList();
+  renderEditor();
+}
+
+function renderCats(){
+  const el = $('#catList');
+  el.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const items = getCatItems(cat);
+    const tab = document.createElement('div');
+    tab.className = 'cat-tab' + (cat === state.activeCat ? ' active' : '');
+    tab.innerHTML =
+      '<span class="swatch" style="background:'+CAT_COLORS[cat]+'"></span>' +
+      '<span class="catname">'+esc(cat)+'</span>' +
+      '<span class="cnt">'+items.length+'</span>';
+    tab.addEventListener('click', ()=>{ state.activeCat = cat; state.selectedId = null; render(); });
+    el.appendChild(tab);
+  });
+}
+
+function renderList(){
+  const el = $('#workList');
+  const items = getCatItems(state.activeCat);
+  el.innerHTML = '';
+  if(items.length === 0){
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px 10px;font-size:13px;">此分类还没有作品<br>点上面「添加新作品」开始</div>';
+    return;
+  }
+  items.forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'work-item' + (it.id === state.selectedId ? ' selected' : '');
+    const hasNew = (it.thumb.blob || it.full.blob);
+    const thHtml = slotPreviewHtml(it.thumb, 'video');
+    div.innerHTML =
+      (hasNew ? '<span class="badge">更新</span>' : '') +
+      '<div class="thumb">' + thHtml + '</div>' +
+      '<div class="info">' +
+        '<div class="no">编号 '+esc(it.num)+'</div>' +
+        '<div class="nm">'+esc(workLabel(it))+'</div>' +
+        '<div class="sfx">'+esc(shortName(slotPath(it, it.full, false) || '未设置大图'))+'</div>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;flex:none;">' +
+        '<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();WB.move(\''+it.id+'\',-1)">↑</button>' +
+        '<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();WB.move(\''+it.id+'\',1)">↓</button>' +
+        '<button class="btn" style="padding:3px 8px;font-size:11px;color:var(--danger);" onclick="event.stopPropagation();WB.remove(\''+it.id+'\')">✕</button>' +
+      '</div>';
+    div.addEventListener('click', ()=>{ state.selectedId = it.id; renderEditor(); renderList(); });
+    el.appendChild(div);
+  });
+}
+
+function workLabel(it){
+  const n = it.num ? ('#'+it.num) : '';
+  if(it.note && it.note.trim()) return it.note.trim().slice(0,20);
+  return (it.cat + ' ' + n);
+}
+
+function shortName(p){
+  if(!p) return '';
+  const parts = p.split('/');
+  return parts[parts.length-1] || p;
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function slotPreviewHtml(slot, tag){
+  if(slot.kind === 'placeholder'){
+    return '<img src="'+slot.preview+'" style="width:100%;height:100%;object-fit:cover;">';
+  }
+  if(slot.blob && slot.preview){
+    if(slot.video) return '<video src="'+slot.preview+'" muted controls playsinline></video>';
+    return '<img src="'+slot.preview+'" style="width:100%;height:100%;object-fit:cover;">';
+  }
+  if(slot.path){
+    if(slot.video) return '<video src="'+slot.path+'" muted controls playsinline></video>';
+    return '<img src="'+slot.path+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.outerHTML=\'<span class=&quot;ph&quot;>🖼️</span>\'">';
+  }
+  return '<span class="ph">'+ (slot.video ? '🎬' : '🖼️') +'</span>';
+}
+
+function renderEditor(){
+  const empty = $('#editorEmpty');
+  const body = $('#editorBody');
+  const it = getItem(state.selectedId);
+  if(!it){
+    empty.style.display = 'flex';
+    body.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  body.style.display = 'block';
+
+  const thumbPath = slotPath(it, it.thumb, true);
+  const fullPath = slotPath(it, it.full, false);
+  const fullIsVideo = it.full.video;
+
+  body.innerHTML =
+    '<div class="ed-head">' +
+      '<span class="cat-chip"><span class="sw" style="background:'+CAT_COLORS[it.cat]+'"></span>'+esc(it.cat)+'</span>' +
+      (fullIsVideo ? '<span class="lock-tag">视频作品</span>' : '<span class="lock-tag">图片作品</span>') +
+      '<span class="hint">此作品已被锁定到「'+esc(it.cat)+'」分类，不会串到别的分类</span>' +
+    '</div>' +
+
+    '<div class="field">' +
+      '<label><b>编号</b>（生成文件名用，如 06 → suolue-06 / 06）</label>' +
+      '<div class="row"><input id="edNum" class="num-in" type="text" value="'+esc(it.num)+'">' +
+      '<span class="hint">当前文件会保存到：<b style="font-family:monospace;color:var(--accent2)">assets/'+esc(it.cat)+'/</b></span></div>' +
+    '</div>' +
+
+    '<div class="field">' +
+      '<label><b>注释文字</b>（可选，点开大图时右下角显示）</label>' +
+      '<textarea id="edNote" placeholder="留空则不显示注释">'+esc(it.note)+'</textarea>' +
+    '</div>' +
+
+    '<div class="divider"></div>' +
+
+    '<div class="field">' +
+      '<label><b>缩略图</b>（网页列表里的小图，固定 4:3）</label>' +
+      '<div class="slot-card">' +
+        '<div class="prev">'+slotPreviewHtml(it.thumb,'video')+'<span class="lab">缩略图 4:3</span></div>' +
+        '<div class="body">' +
+          '<div class="pname">'+(thumbPath||'（未设置，将显示占位图）')+'</div>' +
+          '<div class="acts">' +
+            '<button class="btn" onclick="WB.pickThumbImage()">🖼 上传图片并裁剪 4:3</button>' +
+            '<button class="btn" onclick="WB.cropThumbFromFull()">↳ 从大图裁剪</button>' +
+            (fullIsVideo ? '<button class="btn" onclick="WB.cropThumbFromVideo()">🎬 从视频首帧截取</button>' : '') +
+          '</div>' +
+          '<div class="note2">上传任意图片后会自动弹出 4:3 裁剪框，裁剪结果就是缩略图。</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="field">' +
+      '<label><b>大图 / 视频</b>（点开作品后显示的内容）</label>' +
+      '<div class="slot-card">' +
+        '<div class="prev full-prev">'+slotPreviewHtml(it.full,'video')+'<span class="lab">'+(fullIsVideo?'视频':'大图')+'</span></div>' +
+        '<div class="body">' +
+          '<div class="pname">'+(fullPath||'（未设置，将显示占位图）')+'</div>' +
+          '<div class="acts">' +
+            '<button class="btn" onclick="WB.pickFullImage()">🖼 上传图片</button>' +
+            '<button class="btn" onclick="WB.pickFullVideo()">🎬 上传视频 (mp4)</button>' +
+          '</div>' +
+          '<div class="note2">视频请用 mp4 格式，网页只识别 .mp4 结尾的视频文件。</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // bind editor inputs
+  $('#edNum').addEventListener('input', e => {
+    it.num = e.target.value.trim();
+    renameAutoPaths(it);
+    renderList();
+  });
+  $('#edNote').addEventListener('input', e => { it.note = e.target.value; });
+}
+
+function renameAutoPaths(it){
+  ['thumb','full'].forEach(k => {
+    const s = it[k];
+    if(s.kind === 'file' && s.auto && s.blob){
+      const ext = s.ext;
+      s.path = (k === 'thumb') ? `assets/${it.cat}/suolue-${it.num}.${ext}` : `assets/${it.cat}/${it.num}.${ext}`;
+    }
+  });
+}
+
+/* ---------- 编辑操作 ---------- */
+function addWork(){
+  const items = getCatItems(state.activeCat);
+  const num = pad2(items.length + 1);
+  const color = CAT_COLORS[state.activeCat];
+  const it = {
+    id: newId(),
+    cat: state.activeCat,
+    num,
+    note: '',
+    thumb: makePlaceholder('缩略图', '#1E293B', color),
+    full: makePlaceholder('作品大图', '#0F172A', color),
+  };
+  state.items.push(it);
+  state.selectedId = it.id;
+  render();
+  toast('已在「'+state.activeCat+'」添加新作品（编号 '+num+'）','ok');
+}
+
+function move(id, dir){
+  const it = getItem(id); if(!it) return;
+  const arr = state.items.filter(x => x.cat === it.cat);
+  const idx = arr.findIndex(x => x.id === id);
+  const target = arr[idx + dir];
+  if(!target) return;
+  // swap within global array
+  const gi = state.items.indexOf(it), gt = state.items.indexOf(target);
+  state.items[gi] = target; state.items[gt] = it;
+  render();
+}
+
+function remove(id){
+  const it = getItem(id); if(!it) return;
+  if(!confirm('确定删除「'+(workLabel(it))+'」吗？')) return;
+  [it.thumb, it.full].forEach(s => { if(s.preview && s.preview.indexOf('blob:')===0) URL.revokeObjectURL(s.preview); });
+  state.items = state.items.filter(x => x.id !== id);
+  if(state.selectedId === id) state.selectedId = null;
+  render();
+  toast('已删除');
+}
+
+/* ---------- 文件上传 ---------- */
+function pickFullImage(){ document.getElementById('inFullImg').click(); }
+function pickFullVideo(){ document.getElementById('inFullVideo').click(); }
+function pickThumbImage(){
+  document.getElementById('inThumb').click();
+}
+
+function setSlotBlob(slotKey, blob, ext, isVideo, keepPath){
+  const it = getItem(state.selectedId); if(!it) return;
+  const slot = it[slotKey];
+  let path, auto;
+  if(keepPath && slot.kind==='file' && slot.path){
+    path = slot.path; auto = false;   // 原地覆盖已有文件
+  } else {
+    path = (slotKey==='thumb') ? `assets/${it.cat}/suolue-${it.num}.${ext}` : `assets/${it.cat}/${it.num}.${ext}`;
+    auto = true;
+  }
+  if(slot.preview && slot.preview.indexOf('blob:')===0) { try{URL.revokeObjectURL(slot.preview);}catch(e){} }
+  it[slotKey] = { kind:'file', video:!!isVideo, blob, ext, path, auto, preview: URL.createObjectURL(blob) };
+  render();
+  toast('已设置'+(isVideo?'视频':'图片')+(slotKey==='thumb'?'缩略图':'大图'), 'ok');
+}
+
+function handleFullImageFile(file){
+  const it = getItem(state.selectedId);
+  const ext = extOf(file.name) || 'png';
+  const keep = it.full.kind==='file' && it.full.path;   // 若原本就是文件，则原地覆盖
+  setSlotBlob('full', file, ext, false, keep);
+}
+
+function handleFullVideoFile(file){
+  const it = getItem(state.selectedId);
+  const ext = extOf(file.name) || 'mp4';
+  if(ext !== 'mp4'){
+    toast('注意：网页只识别 .mp4，建议转成 mp4 再导入','err');
+  }
+  const keep = it.full.kind==='file' && it.full.path;
+  setSlotBlob('full', file, ext, true, keep);
+}
+
+/* ---------- 缩略图裁剪 ---------- */
+function loadImage(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = ()=>resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function toSourceCanvas(el, w, h){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(el, 0, 0, w, h);
+  return c;
+}
+
+async function cropThumbFromFull(){
+  const it = getItem(state.selectedId); if(!it) return;
+  if(!it.full.blob){ toast('请先上传大图', 'err'); return; }
+  if(it.full.video){ toast('大图是视频，请用「从视频首帧截取」','err'); return; }
+  const img = await loadImage(it.full.preview);
+  const c = toSourceCanvas(img, img.naturalWidth, img.naturalHeight);
+  openCropper(c);
+}
+
+function captureFrame(blob){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const v = document.createElement('video');
+    let done = false;
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    const cleanup = ()=>URL.revokeObjectURL(url);
+    const grab = ()=>{
+      if(done) return; done = true;
+      const c = document.createElement('canvas');
+      c.width = v.videoWidth || 1280;
+      c.height = v.videoHeight || 720;
+      try { c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); } catch(e){}
+      cleanup();
+      resolve(c);
+    };
+    v.onloadeddata = ()=>{
+      try { v.currentTime = Math.min(0.1, (v.duration||0.1)); } catch(e){ grab(); }
+    };
+    v.onseeked = grab;
+    v.onerror = ()=>{ cleanup(); reject(new Error('视频读取失败')); };
+    setTimeout(grab, 1500);
+    v.src = url;
+    v.load();
+  });
+}
+
+async function cropThumbFromVideo(){
+  const it = getItem(state.selectedId); if(!it) return;
+  if(!it.full.blob || !it.full.video){ toast('请先上传视频','err'); return; }
+  try {
+    toast('正在提取视频首帧…');
+    const c = await captureFrame(it.full.blob);
+    openCropper(c);
+  } catch(e){ toast('提取视频首帧失败：'+e.message,'err'); }
+}
+
+/* ----- 裁剪编辑器 ----- */
+const cropState = { src:null, box:null, drag:null, ctx:null, canvas:null, preview:null, pctx:null, aspect:4/3 };
+
+function openCropper(srcCanvas){
+  cropState.src = srcCanvas;
+  const iw = srcCanvas.width, ih = srcCanvas.height;
+  const ar = cropState.aspect;
+  let w,h;
+  if(iw/ih > ar){ h=ih; w=ih*ar; } else { w=iw; h=iw/ar; }
+  cropState.box = { x0:(iw-w)/2, y0:(ih-h)/2, x1:(iw-w)/2+w, y1:(ih-h)/2+h };
+  $('#cropOverlay').classList.add('show');
+  cropState.canvas = $('#cropCanvas');
+  cropState.ctx = cropState.canvas.getContext('2d');
+  cropState.preview = $('#cropPreview');
+  cropState.pctx = cropState.preview.getContext('2d');
+  resizeCrop();
+  drawCrop();
+}
+
+function resizeCrop(){
+  const c = cropState.canvas;
+  const r = c.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  c.width = Math.max(1, Math.round(r.width*dpr));
+  c.height = Math.max(1, Math.round(r.height*dpr));
+}
+window.addEventListener('resize', ()=>{ if(cropState.src){ resizeCrop(); drawCrop(); } });
+
+function cropFit(){
+  const iw = cropState.src.width, ih = cropState.src.height;
+  const s = Math.min(cropState.canvas.width/iw, cropState.canvas.height/ih);
+  const dw = iw*s, dh = ih*s;
+  const ox = (cropState.canvas.width-dw)/2, oy = (cropState.canvas.height-dh)/2;
+  return { s, dw, dh, ox, oy };
+}
+
+function drawCrop(){
+  const ctx = cropState.ctx; if(!ctx) return;
+  const c = cropState.canvas;
+  ctx.clearRect(0,0,c.width,c.height);
+  const f = cropFit();
+  const {x0,y0,x1,y1} = cropState.box;
+  ctx.drawImage(cropState.src, f.ox, f.oy, f.dw, f.dh);
+  const bx=f.ox+x0*f.s, by=f.oy+y0*f.s, bw=(x1-x0)*f.s, bh=(y1-y0)*f.s;
+
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  ctx.fillRect(0,0,c.width,c.height);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(bx,by,bw,bh); ctx.clip();
+  ctx.drawImage(cropState.src, f.ox, f.oy, f.dw, f.dh);
+  ctx.restore();
+
+  ctx.strokeStyle='#38bdf8'; ctx.lineWidth=2; ctx.strokeRect(bx,by,bw,bh);
+  ctx.strokeStyle='rgba(56,189,248,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(bx+bw/3,by); ctx.lineTo(bx+bw/3,by+bh);
+  ctx.moveTo(bx+2*bw/3,by); ctx.lineTo(bx+2*bw/3,by+bh);
+  ctx.moveTo(bx,by+bh/3); ctx.lineTo(bx+bw,by+bh/3);
+  ctx.moveTo(bx,by+2*bh/3); ctx.lineTo(bx+bw,by+2*bh/3);
+  ctx.stroke();
+
+  const rd=9, hw=rd/2;
+  const pts=[[bx,by],[bx+bw/2,by],[bx+bw,by],[bx,by+bh/2],[bx+bw,by+bh/2],[bx,by+bh],[bx+bw/2,by+bh],[bx+bw,by+bh]];
+  ctx.fillStyle='#fff'; ctx.strokeStyle='#0284c7'; ctx.lineWidth=1.5;
+  pts.forEach(([px,py])=>{ ctx.beginPath(); ctx.rect(px-hw,py-hw,rd,rd); ctx.fill(); ctx.stroke(); });
+
+  drawCropPreview();
+}
+
+function drawCropPreview(){
+  const pctx = cropState.pctx; if(!pctx) return;
+  const {x0,y0,x1,y1} = cropState.box;
+  const sw=x1-x0, sh=y1-y0;
+  pctx.clearRect(0,0,cropState.preview.width,cropState.preview.height);
+  pctx.drawImage(cropState.src, x0,y0,sw,sh, 0,0,cropState.preview.width,cropState.preview.height);
+}
+
+function cropToImage(e){
+  const r = cropState.canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  const f = cropFit();
+  const mx=(e.clientX-r.left)*dpr, my=(e.clientY-r.top)*dpr;
+  return { ix: clamp((mx-f.ox)/f.s, 0, cropState.src.width), iy: clamp((my-f.oy)/f.s, 0, cropState.src.height) };
+}
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+function cropHit(ix,iy){
+  const f = cropFit();
+  const {x0,y0,x1,y1} = cropState.box;
+  const rd = 9/f.s;
+  const near=(px,py)=>Math.abs(ix-px)<=rd && Math.abs(iy-py)<=rd;
+  if(near(x0,y0)) return 'nw'; if(near(x1,y0)) return 'ne';
+  if(near(x0,y1)) return 'sw'; if(near(x1,y1)) return 'se';
+  if(Math.abs(iy-y0)<=rd) return 'n'; if(Math.abs(iy-y1)<=rd) return 's';
+  if(Math.abs(ix-x0)<=rd) return 'w'; if(Math.abs(ix-x1)<=rd) return 'e';
+  if(ix>x0&&ix<x1&&iy>y0&&iy<y1) return 'move';
+  return null;
+}
+
+function computeCropResize(handle, box0, px, py){
+  const iw = cropState.src.width, ih = cropState.src.height;
+  const ar = cropState.aspect;
+  let {x0,y0,x1,y1} = box0;
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  px = clamp(px,0,iw); py = clamp(py,0,ih);
+  const MINP = 12;
+  const mW = handle.indexOf('w')>=0, mE = handle.indexOf('e')>=0;
+  const mN = handle.indexOf('n')>=0, mS = handle.indexOf('s')>=0;
+  let ax = mW ? x1 : (mE ? x0 : cx);
+  let ay = mN ? y1 : (mS ? y0 : cy);
+  const rawW = Math.max(Math.abs(px-ax), MINP);
+  const rawH = Math.max(Math.abs(py-ay), MINP);
+  const w = Math.max(rawW, rawH*ar);
+  const h = w/ar;
+  if(mW){ x1=ax; x0=ax-w; } else if(mE){ x0=ax; x1=ax+w; } else { x0=ax-w/2; x1=ax+w/2; }
+  if(mN){ y1=ay; y0=ay-h; } else if(mS){ y0=ay; y1=ay+h; } else { y0=ay-h/2; y1=ay+h/2; }
+  if(x1-x0 < MINP){ x0=clamp(cx-MINP/2,0,iw); x1=clamp(cx+MINP/2,0,iw); }
+  if(y1-y0 < MINP){ y0=clamp(cy-MINP/2,0,ih); y1=clamp(cy+MINP/2,0,ih); }
+  x0=clamp(x0,0,iw); y0=clamp(y0,0,ih); x1=clamp(x1,0,iw); y1=clamp(y1,0,ih);
+  return {x0,y0,x1,y1};
+}
+
+function attachCropEvents(){
+  const c = $('#cropCanvas');
+  c.addEventListener('pointerdown', e=>{
+    if(!cropState.src) return;
+    c.setPointerCapture(e.pointerId);
+    const {ix,iy} = cropToImage(e);
+    const h = cropHit(ix,iy);
+    if(!h) return;
+    cropState.drag = { mode:(h==='move'?'move':'resize'), handle:h, startBox:{...cropState.box}, startIx:ix, startIy:iy };
+  });
+  c.addEventListener('pointermove', e=>{
+    if(!cropState.src || !cropState.drag) return;
+    const {ix,iy} = cropToImage(e);
+    if(cropState.drag.mode==='move'){
+      const box = cropState.drag.startBox;
+      const w = box.x1-box.x0, h = box.y1-box.y0;
+      let nx0 = clamp(box.x0 + (ix-cropState.drag.startIx), 0, cropState.src.width - w);
+      let ny0 = clamp(box.y0 + (iy-cropState.drag.startIy), 0, cropState.src.height - h);
+      cropState.box = { x0:nx0, y0:ny0, x1:nx0+w, y1:ny0+h };
+    } else {
+      cropState.box = computeCropResize(cropState.drag.handle, cropState.drag.startBox, ix, iy);
+    }
+    drawCrop();
+    const h = cropHit(ix,iy) || cropState.drag.handle;
+    c.style.cursor = h==='move' ? 'move' : (h ? 'nwse-resize' : 'crosshair');
+  });
+  const end = e=>{
+    if(cropState.drag){
+      cropState.drag = null;
+      try{c.releasePointerCapture(e.pointerId);}catch(err){}
+    }
+    c.style.cursor='crosshair';
+  };
+  c.addEventListener('pointerup', end);
+  c.addEventListener('pointercancel', end);
+}
+
+async function cropThumbFromUploadedImage(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    const c = toSourceCanvas(img, img.naturalWidth, img.naturalHeight);
+    openCropper(c);
+  } catch(e){ toast('图片读取失败','err'); }
+  finally { URL.revokeObjectURL(url); }
+}
+
+function cropApply(){
+  if(!cropState.src) return;
+  const {x0,y0,x1,y1} = cropState.box;
+  const sw = x1-x0, sh = y1-y0;
+  const out = document.createElement('canvas');
+  out.width = THUMB_W; out.height = THUMB_H;
+  const octx = out.getContext('2d');
+  octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'high';
+  octx.drawImage(cropState.src, x0,y0,sw,sh, 0,0,THUMB_W,THUMB_H);
+  out.toBlob(blob => {
+    const it = getItem(state.selectedId);
+    const keep = (it && it.thumb.kind==='file' && it.thumb.path);
+    setSlotBlob('thumb', blob, 'png', false, !!keep);
+    cropCancel();
+  }, 'image/png');
+}
+
+function cropCancel(){
+  $('#cropOverlay').classList.remove('show');
+  cropState.src=null; cropState.box=null; cropState.drag=null;
+}
+
+/* ---------- 导出：生成 works.js ---------- */
+const GENERATE_PLACEHOLDER_SRC = [
+'function generatePlaceholder(text, bgColor, textColor) {',
+'  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">',
+'    <rect width="400" height="300" fill="${bgColor}"/>',
+'    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">',
+'    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="${textColor}" stroke-width="0.5" opacity="0.15"/></pattern>',
+'    <rect width="400" height="300" fill="url(#grid)"/>',
+'    <circle cx="200" cy="130" r="45" fill="none" stroke="${textColor}" stroke-width="3"/>',
+'    <text x="200" y="135" font-family="monospace" font-size="20" font-weight="bold" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${text}</text>',
+'    <text x="200" y="220" font-family="sans-serif" font-size="12" fill="${textColor}" opacity="0.7" text-anchor="middle">点击查看详情</text>',
+'  </svg>`;',
+'  return \'data:image/svg+xml;utf8,\' + encodeURIComponent(svg);',
+'}'
+].join('\n');
+
+function slotOutput(item, slot, isThumb){
+  if(slot.kind === 'placeholder'){
+    return 'generatePlaceholder(' + JSON.stringify(slot.text) + ', ' + JSON.stringify(slot.bg) + ', ' + JSON.stringify(slot.fg) + ')';
+  }
+  return JSON.stringify(slotPath(item, slot, isThumb) || '');
+}
+
+function buildWorksJs(){
+  const c = state.config;
+  const L = [];
+  L.push('/** ================================================');
+  L.push(' *  复古像素作品集配置文件 (works.js)');
+  L.push(' *  本文件由「作品集管理工作台」自动生成。');
+  L.push(' *  建议以后都用工作台维护，不要手动改这里。');
+  L.push(' * ================================================ */');
+  L.push('');
+  L.push('const DEBUG = ' + c.DEBUG + ';');
+  L.push('const HOME_URL = ' + JSON.stringify(c.HOME_URL) + ';');
+  L.push('const SECRET_VIDEO = ' + JSON.stringify(c.SECRET_VIDEO) + ';');
+  L.push('');
+  L.push(GENERATE_PLACEHOLDER_SRC);
+  L.push('');
+  L.push('const WORKS = {');
+  CATEGORIES.forEach((cat, ci) => {
+    const items = getCatItems(cat);
+    L.push('  ' + JSON.stringify(cat) + ': [');
+    items.forEach((it, ii) => {
+      const fields = [];
+      fields.push('thumb: ' + slotOutput(it, it.thumb, true));
+      fields.push('full: ' + slotOutput(it, it.full, false));
+      if(it.note && it.note.trim() !== '') fields.push('note: ' + JSON.stringify(it.note.trim()));
+      const lastIt = ii === items.length - 1;
+      L.push('    // ' + cat + '-' + pad2(ii + 1));
+      L.push('    {');
+      fields.forEach((f, fi) => {
+        L.push('      ' + f + (fi === fields.length - 1 ? '' : ','));
+      });
+      L.push('    }' + (lastIt ? '' : ','));
+    });
+    const lastCat = ci === CATEGORIES.length - 1;
+    L.push('  ]' + (lastCat ? '' : ','));
+  });
+  L.push('};');
+  return L.join('\n');
+}
+
+/* ---------- 导出：ZIP ---------- */
+const CRC_TABLE = (()=>{
+  const t = new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c=n;
+    for(let k=0;k<8;k++) c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1);
+    t[n]=c;
+  }
+  return t;
+})();
+function crc32(u8){
+  let c=0xFFFFFFFF;
+  for(let i=0;i<u8.length;i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c>>>8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function dosDateTime(d){
+  d = d || new Date();
+  const time = (d.getHours()<<11) | (d.getMinutes()<<5) | (Math.floor(d.getSeconds()/2));
+  const date = ((d.getFullYear()-1980)<<9) | ((d.getMonth()+1)<<5) | d.getDate();
+  return { time, date };
+}
+function buildZip(files){
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  files.forEach(f => {
+    const nameU8 = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const size = f.data.length;
+    const {time, date} = dosDateTime(new Date());
+
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true);
+    local.setUint16(4, 20, true);
+    local.setUint16(6, 0x0800, true);
+    local.setUint16(8, 0, true);
+    local.setUint16(10, time, true);
+    local.setUint16(12, date, true);
+    local.setUint32(14, crc, true);
+    local.setUint32(18, size, true);
+    local.setUint32(22, size, true);
+    local.setUint16(26, nameU8.length, true);
+    local.setUint16(28, 0, true);
+    parts.push(new Uint8Array(local.buffer), nameU8, f.data);
+
+    const cen = new DataView(new ArrayBuffer(46));
+    cen.setUint32(0, 0x02014b50, true);
+    cen.setUint16(4, 20, true);
+    cen.setUint16(6, 20, true);
+    cen.setUint16(8, 0x0800, true);
+    cen.setUint16(10, 0, true);
+    cen.setUint16(12, time, true);
+    cen.setUint16(14, date, true);
+    cen.setUint32(16, crc, true);
+    cen.setUint32(20, size, true);
+    cen.setUint32(24, size, true);
+    cen.setUint16(28, nameU8.length, true);
+    cen.setUint16(30, 0, true);
+    cen.setUint16(32, 0, true);
+    cen.setUint16(34, 0, true);
+    cen.setUint16(36, 0, true);
+    cen.setUint32(38, 0, true);
+    cen.setUint32(42, offset, true);
+    central.push(new Uint8Array(cen.buffer), nameU8);
+
+    offset += 30 + nameU8.length + size;
+  });
+
+  const centralSize = central.reduce((s,u)=>s+u.length,0);
+  const centralOffset = offset;
+  const eocd = new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0, 0x06054b50, true);
+  eocd.setUint16(4, 0, true);
+  eocd.setUint16(6, 0, true);
+  eocd.setUint16(8, files.length, true);
+  eocd.setUint16(10, files.length, true);
+  eocd.setUint32(12, centralSize, true);
+  eocd.setUint32(16, centralOffset, true);
+  eocd.setUint16(20, 0, true);
+
+  return new Blob(parts.concat(central, [new Uint8Array(eocd.buffer)]), {type:'application/zip'});
+}
+async function blobToU8(blob){ const b = await blob.arrayBuffer(); return new Uint8Array(b); }
+function downloadBlob(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 800);
+}
+
+const README = [
+'作品集更新包 使用说明',
+'======================',
+'1. 把本 zip 解压，得到：works.js、使用说明.txt、assets 文件夹。',
+'2. 把解压出来的内容全部复制到你的作品集项目根目录',
+'   （就是 index.html 和 works.js 所在的那个文件夹），',
+'   提示「替换/合并」时一律选「是 / 替换」。',
+'3. 刷新作品集网页 index.html，没变化就按 Ctrl+Shift+R 强制刷新。',
+'',
+'说明：',
+'- 只有你这次「新上传/修改」的图片和视频会被打进包里，旧文件不重复打包。',
+'- 视频请用 mp4；网页只识别 .mp4 结尾的视频文件。',
+'- 之后再有改动，直接重新打开「工作台」→ 修改 → 再导出即可。'
+].join('\r\n');
+
+function newFileCount(){
+  let n = 0;
+  for(const it of state.items){
+    if(it.thumb.kind==='file' && it.thumb.blob) n++;
+    if(it.full.kind==='file' && it.full.blob) n++;
+  }
+  return n;
+}
+
+function openExport(){
+  $('#exportCode').value = buildWorksJs();
+  const n = newFileCount();
+  $('#exportStat').textContent = '共 '+state.items.length+' 个作品 · 本次新增/更新 '+n+' 个文件';
+  $('#exportOverlay').classList.add('show');
+}
+function closeExport(){ $('#exportOverlay').classList.remove('show'); }
+
+async function downloadZip(){
+  const enc = new TextEncoder();
+  const files = [];
+  files.push({ name:'works.js', data: enc.encode(buildWorksJs()) });
+  for(const it of state.items){
+    if(it.thumb.kind==='file' && it.thumb.blob){
+      files.push({ name: slotPath(it, it.thumb, true), data: await blobToU8(it.thumb.blob) });
+    }
+    if(it.full.kind==='file' && it.full.blob){
+      files.push({ name: slotPath(it, it.full, false), data: await blobToU8(it.full.blob) });
+    }
+  }
+  files.push({ name:'使用说明.txt', data: enc.encode(README) });
+  const zip = buildZip(files);
+  downloadBlob(zip, '作品集更新包.zip');
+  toast('已生成更新包（含 '+newFileCount()+' 个新文件 + works.js）','ok');
+}
+
+async function copyCode(){
+  const code = buildWorksJs();
+  try {
+    await navigator.clipboard.writeText(code);
+    toast('已复制 works.js 代码','ok');
+  } catch(e){
+    const ta = $('#exportCode'); ta.focus(); ta.select();
+    try { document.execCommand('copy'); toast('已复制','ok'); } catch(e2){ toast('复制失败，请手动全选复制','err'); }
+  }
+}
+
+/* ---------- 导入 ---------- */
+function openImport(){ $('#importOverlay').classList.add('show'); }
+function closeImport(){ $('#importOverlay').classList.remove('show'); }
+
+function parseWorksJsText(text){
+  const c = state.config;
+  let HOME_URL = c.HOME_URL, SECRET_VIDEO = c.SECRET_VIDEO, DEBUG = c.DEBUG;
+  const mh = /const\s+HOME_URL\s*=\s*["']([^"']*)["']/.exec(text); if(mh) HOME_URL = mh[1];
+  const ms = /const\s+SECRET_VIDEO\s*=\s*["']([^"']*)["']/.exec(text); if(ms) SECRET_VIDEO = ms[1] || '';
+  const md = /const\s+DEBUG\s*=\s*(true|false)/.exec(text); if(md) DEBUG = (md[1]==='true');
+  let works;
+  try {
+    const fn = new Function(text + '\n;return WORKS;');
+    works = fn();
+  } catch(e){
+    throw new Error('无法解析：请确认粘贴的是完整的 works.js 文件内容');
+  }
+  if(!works || typeof works !== 'object') throw new Error('没有找到 WORKS 数据');
+  return { HOME_URL, SECRET_VIDEO, DEBUG, works };
+}
+
+function doImport(){
+  const text = $('#importText').value.trim();
+  if(!text){ toast('请先粘贴 works.js 内容或选择文件','err'); return; }
+  try {
+    const r = parseWorksJsText(text);
+    state.config = { DEBUG: r.DEBUG, HOME_URL: r.HOME_URL, SECRET_VIDEO: r.SECRET_VIDEO };
+    state.items = loadFromWorks(r.works);
+    state.activeCat = 'LIVE2D';
+    state.selectedId = null;
+    render();
+    closeImport();
+    toast('导入成功，共 '+state.items.length+' 个作品','ok');
+  } catch(e){
+    toast(e.message,'err');
+  }
+}
+
+function reloadWorks(){
+  if(!confirm('重新从同目录 works.js 读取？（会放弃本次未导出的修改）')) return;
+  location.reload();
+}
+
+/* ---------- 文件输入绑定 ---------- */
+$('#inFullImg').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleFullImageFile(f); e.target.value=''; });
+$('#inFullVideo').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleFullVideoFile(f); e.target.value=''; });
+$('#inThumb').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) cropThumbFromUploadedImage(f); e.target.value=''; });
+$('#importFileInput').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ $('#importText').value = String(r.result || ''); doImport(); };
+  r.readAsText(f);
+  e.target.value='';
+});
+
+/* ---------- 全局 API（供 HTML 内 onclick 调用）---------- */
+window.WB = {
+  addWork, move, remove,
+  pickFullImage, pickFullVideo, pickThumbImage,
+  cropThumbFromFull, cropThumbFromVideo,
+  cropApply, cropCancel,
+  openExport, closeExport, downloadZip, copyCode,
+  openImport, closeImport, doImport, reloadWorks
+};
+
+/* ---------- 启动 ---------- */
+attachCropEvents();
+render();
+if(_ext.source === 'file'){
+  toast('已自动读取同目录 works.js，同步 '+state.items.length+' 个作品','ok');
+} else {
+  toast('未在同目录找到 works.js，暂时载入内置示例数据');
+}
+console.log('作品集管理工作台已就绪');
+})();
+</script>
+</body>
+</html>

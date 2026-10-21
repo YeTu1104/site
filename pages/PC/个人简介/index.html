@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>个人简介</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #F5E6D3;
+    font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "SimHei", "Noto Sans CJK SC", sans-serif;
+  }
+
+  /* 设计画布：1903x1080，随后整体缩放完整放入窗口（contain 模式，四周黑边不留滚动条） */
+  #stage {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 1903px;
+    height: 1080px;
+    background: url('picture/背景.png') no-repeat 0 0;
+    background-size: 1903px 1080px;
+    transform-origin: 0 0;
+  }
+
+  img {
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  button {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+  }
+
+  /* ---------- 左上角人物 ---------- */
+  #character {
+    position: absolute;
+    left: 64px;
+    top: 51px;
+    width: 412px;
+    height: auto;
+    pointer-events: none;
+  }
+
+  /* ---------- HELLO 按钮 ---------- */
+  #helloBtn {
+    position: absolute;
+    left: 26px;
+    top: 610px;
+    width: 502px;
+    height: auto;
+  }
+  #helloBtn img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.06s ease, filter 0.06s ease;
+  }
+  /* 按下效果 */
+  #helloBtn:active img {
+    transform: translateY(5px) scale(0.985);
+    filter: brightness(0.82);
+  }
+
+  /* ---------- 三个状态滑块 ---------- */
+  .slider {
+    position: absolute;
+    top: 806px;
+    width: 40px;
+  }
+  .s-icon {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    height: auto;
+    z-index: 2;
+  }
+  .track {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 40px;
+    height: 231px;
+    background: url('UI/滑轨.png') center / 100% 100% no-repeat;
+    overflow: hidden;
+    z-index: 1;
+  }
+  .fill {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    bottom: 4px;
+    height: 50%;
+    background: url('UI/滑块.png') center / 100% 100% no-repeat;
+    transition: height 0.75s ease-in-out;
+  }
+
+  /* ---------- 右侧白板文字区域 ---------- */
+  #textArea {
+    position: absolute;
+    left: 660px;
+    top: 90px;
+    width: 1040px;
+    height: 880px;
+    overflow: hidden;
+  }
+  #textContent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 18px 24px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 28px;
+    line-height: 1.72;
+    color: #4b3a5a;
+    will-change: transform;
+  }
+
+  /* ---------- 上下滚动按钮 ---------- */
+  .scroll-btn {
+    position: absolute;
+    width: 90px;
+    height: auto;
+  }
+  .scroll-btn img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.06s ease, filter 0.06s ease;
+  }
+  .scroll-btn:hover img {
+    filter: brightness(1.08);
+  }
+  .scroll-btn:active img {
+    transform: translateY(3px);
+    filter: brightness(0.8);
+  }
+  #upBtn { left: 1749px; top: 77px; }
+  #dnBtn { left: 1749px; top: 951px; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <!-- 待机/说话 GIF -->
+    <img id="character" src="picture/待机.gif" alt="">
+
+    <!-- HELLO 按钮 -->
+    <button id="helloBtn" type="button">
+      <img src="UI/你好.png" alt="你好">
+    </button>
+
+    <!-- 三个滑块：心情 / 饱食 / 困意 -->
+    <div class="slider" style="left: 110px;">
+      <img class="s-icon" style="width:95px; top:-51px;" src="UI/心情.png" alt="心情">
+      <div class="track"><div class="fill" data-slider></div></div>
+    </div>
+    <div class="slider" style="left: 232px;">
+      <img class="s-icon" style="width:95px; top:-105px;" src="UI/饱食.png" alt="饱食">
+      <div class="track"><div class="fill" data-slider></div></div>
+    </div>
+    <div class="slider" style="left: 354px;">
+      <img class="s-icon" style="width:101px; top:-66px;" src="UI/困意.png" alt="困意">
+      <div class="track"><div class="fill" data-slider></div></div>
+    </div>
+
+    <!-- 右侧白板文字 -->
+    <div id="textArea">
+      <div id="textContent"></div>
+    </div>
+
+    <!-- 上下滚动按钮 -->
+    <button class="scroll-btn" id="upBtn" type="button">
+      <img src="UI/上.png" alt="向上">
+    </button>
+    <button class="scroll-btn" id="dnBtn" type="button">
+      <img src="UI/下.png" alt="向下">
+    </button>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ========== 1. 整体完整放入窗口（contain 缩放，无滚动条） ========== */
+  var DESIGN_W = 1903;
+  var DESIGN_H = 1080;
+  var stage = document.getElementById("stage");
+
+  function fit() {
+    var s = Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
+    stage.style.transform = "scale(" + s + ")";
+    stage.style.left = ((window.innerWidth - DESIGN_W * s) / 2) + "px";
+    stage.style.top = ((window.innerHeight - DESIGN_H * s) / 2) + "px";
+  }
+  window.addEventListener("resize", fit);
+  fit();
+
+  /* ========== 2. 人物 GIF 切换 ========== */
+  var character = document.getElementById("character");
+
+  function setChar(which) {
+    character.src = (which === "speaking") ? "picture/说话.gif" : "picture/待机.gif";
+  }
+
+  /* ========== 3. 三个滑块随机变化（每 0.05 秒） ========== */
+  var fills = document.querySelectorAll(".fill[data-slider]");
+
+  function randomizeFill() {
+    for (var i = 0; i < fills.length; i++) {
+      // 5% ~ 95%，确保滑块不超出滑轨的最上与最下
+      var p = 5 + Math.random() * 90;
+      fills[i].style.height = p + "%";
+    }
+  }
+  randomizeFill();
+  setInterval(randomizeFill, 750);
+
+  /* ========== 4. 打字机效果（占位文字） ========== */
+  var textArea = document.getElementById("textArea");
+  var textContent = document.getElementById("textContent");
+  var helloBtn = document.getElementById("helloBtn");
+
+  var INTRO_TEXT = [
+    "你好哦，欢迎你来到我的个人网站。",
+    "我是叶荼！一只黑色的猫猫！",
+    "我是一名全职绘师、Vtuber（大概）以及万事屋。",
+    "",
+    "除了自己的个人创作，我也在为很多Vtuber提供角色设计、角色立绘、插画绘制、VTuber 形象设计与 Live2D 立绘拆件等等的美术支持。",
+    "Vtuber真是个辛苦的行业啊，有时觉得能帮上忙真的太好了。",
+    "当然我也在接普通人的委托，OC设计、同人图之类的委托也是我工作的一部分。",
+    "总之我是想说：很高兴为您服务。这样。",
+    "",
+    "很高兴你看到了这里，希望你在这个网站有收获到一些乐趣（毕竟搞了很多交互），请也看看其他的地方吧！",
+    "",
+    "如果想要联系我可以通过我的邮箱yesitubai1104@gmail.com，或者我的社交平台！"
+  ].join("\n");
+
+  var typed = false;   // 文字是否已全部出现
+  var started = false; // 是否已经开始过打字
+  var typing = false;
+  var pos = 0;
+  var scrollPos = 0;
+
+  function maxScroll() {
+    return Math.max(0, textContent.scrollHeight - textArea.clientHeight);
+  }
+
+  function applyScroll() {
+    textContent.style.transform = "translateY(" + (-scrollPos) + "px)";
+  }
+
+  function scrollTo(v) {
+    scrollPos = Math.max(0, Math.min(maxScroll(), v));
+    applyScroll();
+  }
+
+  // 估算一页能容纳的字符数，用于把“填满一版”的耗时控制在约 1 秒
+  function charsPerPage() {
+    var cs = window.getComputedStyle(textContent);
+    var fsize = parseFloat(cs.fontSize) || 28;
+    var lineH = parseFloat(cs.lineHeight) || (fsize * 1.72);
+    var cols = Math.max(1, Math.floor((textArea.clientWidth - 48) / fsize));
+    var rows = Math.max(1, Math.floor(textArea.clientHeight / lineH));
+    return cols * rows;
+  }
+
+  function startTyping() {
+    typing = true;
+    var cpp = Math.max(20, charsPerPage());
+    var interval = 1000 / cpp; // 填满约一版 ≈ 1 秒
+    interval = Math.max(interval, 5000 / INTRO_TEXT.length); // 整个文本打字至少 5 秒
+    var lastBeep = 0;
+    var timer = setInterval(function () {
+      if (pos >= INTRO_TEXT.length) {
+        clearInterval(timer);
+        typing = false;
+        typed = true;
+        scrollTo(maxScroll());
+        // 文字全部出现后，直接切换回待机
+        setChar("idle");
+        return;
+      }
+      pos++;
+      textContent.textContent = INTRO_TEXT.slice(0, pos);
+      scrollTo(maxScroll()); // 自动向下滚动，保证文字不超出顶部
+      var now = Date.now();
+      if (now - lastBeep >= 100) { lastBeep = now; playTalkBeep(); } // 打字期间播放说话哔哔声
+    }, interval);
+  }
+
+  helloBtn.addEventListener("click", function () {
+    playClick(); // 点击音效：咔嚓键盘声
+    if (typed || started) { return; } // 文字完全出现后（或已开始），再按不触发命令
+    started = true;
+    startTyping();
+    // 点击后直接切换为说话
+    setChar("speaking");
+  });
+
+  /* ========== 5. 上下滚动：按钮 + 鼠标滚轮 ========== */
+  var STEP = 90;
+  document.getElementById("upBtn").addEventListener("click", function () {
+    scrollTo(scrollPos - STEP);
+  });
+  document.getElementById("dnBtn").addEventListener("click", function () {
+    scrollTo(scrollPos + STEP);
+  });
+
+  textArea.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    scrollTo(scrollPos + e.deltaY);
+  }, { passive: false });
+
+  /* ========== 6. 音效（Web Audio 合成点击声与说话哔哔声） ========== */
+  var audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { audioCtx = new AC(); }
+    }
+    if (audioCtx && audioCtx.state === "suspended") { audioCtx.resume(); }
+  }
+  function playClick() {
+    ensureAudio();
+    if (!audioCtx) { return; }
+    var t = audioCtx.currentTime;
+    var dur = 0.055;
+    var buffer = audioCtx.createBuffer(1, Math.ceil(audioCtx.sampleRate * dur), audioCtx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+    }
+    var src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    var filter = audioCtx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 900;
+    var gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.45, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(t);
+    src.stop(t + dur);
+  }
+  function playTalkBeep() {
+    ensureAudio();
+    if (!audioCtx) { return; }
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(320 + Math.random() * 340, t);
+    gain.gain.setValueAtTime(0.07, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.06);
+  }
+})();
+</script>
+</body>
+</html>

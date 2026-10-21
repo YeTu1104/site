@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>像素文件夹小部件 · 工作台</title>
+<style>
+  @font-face {
+    font-family: "Nightgazer16";
+    src: url("工作台素材/Nightgazer16.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "SimHei", sans-serif;
+    background: #14151b;
+    color: #e8e9ef;
+    min-height: 100vh;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 20px;
+    background: #1d1f28;
+    border-bottom: 1px solid #2c2f3b;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: 1px; }
+  #pageHeader {
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffd166;
+    background: #2a2416;
+    border: 1px solid #5b4a1d;
+    padding: 6px 14px;
+    border-radius: 6px;
+  }
+  .spacer { flex: 1; }
+  #exportBtn {
+    border: none;
+    background: #3aa675;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #exportBtn:hover { background: #45bd88; }
+
+  /* ---------- 小部件选择 ---------- */
+  #widgetBar { display: flex; align-items: center; gap: 10px; }
+  #widgetName {
+    font-size: 14px; font-weight: 700; color: #7ee787;
+    background: #14251a; border: 1px solid #2c5b3a;
+    padding: 6px 14px; border-radius: 6px; max-width: 280px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #openFileBtn, #pickBtn {
+    border: 1px solid #33364a; background: #12131a; color: #e8e9ef;
+    font-size: 13px; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+  }
+  #openFileBtn { border-color: #2c5b3a; color: #7ee787; }
+  #openFileBtn:hover { border-color: #7ee787; }
+  #pickBtn:hover { border-color: #ffd166; }
+  #fileInput { display: none; }
+  #folderInput { display: none; }
+
+  /* ---------- 主体 ---------- */
+  main {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* ---------- 左：画布 ---------- */
+  .canvas-col { flex: 0 0 auto; }
+  .canvas-card {
+    background: #1d1f28;
+    border: 1px solid #2c2f3b;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .canvas-tip {
+    font-size: 12px;
+    color: #9aa0b0;
+    margin-bottom: 10px;
+  }
+  .canvas-tip b { color: #ffd166; }
+  #paperWrap {
+    position: relative;
+    width: 444px;
+    height: 463px;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #paperImg {
+    display: block;
+    width: 444px;
+    height: 463px;
+    image-rendering: pixelated;
+  }
+
+  /* ---------- 可拖拽/缩放的框 ---------- */
+  .tbox, .bbox {
+    position: absolute;
+    touch-action: none;
+    cursor: move;
+  }
+  .tbox { border: 2px solid #57c7ff; }
+  .bbox { border: 2px solid #7ee787; }
+  .tlabel, .blabel {
+    position: absolute;
+    top: -18px;
+    left: -2px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 4px;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .tlabel { color: #57c7ff; }
+  .blabel { color: #7ee787; }
+  .ttext, .btext {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    padding: 3px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    text-align: center;
+    pointer-events: none;
+    font-family: "Nightgazer16", "MS Gothic", "Microsoft YaHei", monospace;
+  }
+  .ttext { color: #2d2d3a; font-weight: 700; letter-spacing: 2px; line-height: 1.3; }
+  .btext { color: #4a4a55; line-height: 1.6; }
+
+  .h {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border: 2px solid #2c2f3b;
+  }
+  .h-nw { left: -7px; top: -7px; cursor: nwse-resize; }
+  .h-ne { right: -7px; top: -7px; cursor: nesw-resize; }
+  .h-sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
+  .h-se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+
+  /* 画布上的图片框 */
+  .ibox {
+    position: absolute;
+    touch-action: none;
+    cursor: move;
+    border: 2px solid #e08acb;
+  }
+  .ibox img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+  .ilabel {
+    position: absolute;
+    top: -18px;
+    left: -2px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 4px;
+    color: #e08acb;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ---------- 右：面板 ---------- */
+  .panel { flex: 1 1 360px; min-width: 340px; max-width: 460px; display: flex; flex-direction: column; gap: 16px; }
+  fieldset {
+    border: 1px solid #2c2f3b;
+    border-radius: 10px;
+    background: #1d1f28;
+    padding: 14px 16px 16px;
+    margin: 0;
+  }
+  legend {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffd166;
+    padding: 0 6px;
+  }
+  .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .row label { font-size: 13px; color: #c4c9d6; width: 64px; flex: 0 0 auto; }
+  .row input[type="text"], .row input[type="number"], .row textarea {
+    flex: 1;
+    background: #12131a;
+    border: 1px solid #33364a;
+    border-radius: 5px;
+    color: #e8e9ef;
+    font-size: 13px;
+    padding: 7px 9px;
+    font-family: inherit;
+  }
+  .row textarea { min-height: 110px; resize: vertical; }
+  .row input[type="range"] { flex: 1; }
+  .val { font-size: 12px; color: #9aa0b0; width: 34px; text-align: right; }
+
+  .swatches { display: flex; gap: 8px; margin: 6px 0 2px; align-items: center; }
+  .sw {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid #3a3e50; cursor: pointer;
+  }
+  .sw.on { border-color: #ffd166; }
+  #resetColor {
+    border: 1px solid #33364a; background: #12131a; color: #c4c9d6;
+    font-size: 12px; padding: 5px 10px; border-radius: 5px; cursor: pointer;
+  }
+
+  /* 文件夹预览 */
+  .folder-preview {
+    position: relative;
+    width: 253px;
+    height: 148px;
+    margin: 8px auto 6px;
+    background: #0f1016;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .folder-preview img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 253px;
+    height: 148px;
+    image-rendering: pixelated;
+  }
+  #fpName {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    top: 80px;
+    text-align: center;
+    color: #2C3E50;
+    font-weight: 700;
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
+
+  /* 分页 */
+  .pager { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .pager button {
+    background: #12131a; border: 1px solid #33364a; color: #e8e9ef;
+    width: 34px; height: 34px; border-radius: 6px; font-size: 15px; cursor: pointer;
+  }
+  .pager button:hover { border-color: #ffd166; }
+  #pageDots { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dot {
+    min-width: 30px; height: 30px; padding: 0 6px;
+    display: flex; align-items: center; justify-content: center;
+    background: #12131a; border: 1px solid #33364a; border-radius: 6px;
+    font-size: 13px; cursor: pointer; color: #c4c9d6;
+  }
+  .dot.on { background: #ffd166; color: #1d1f28; border-color: #ffd166; font-weight: 700; }
+  .pager-info { font-size: 13px; color: #9aa0b0; margin: 4px 0 6px; }
+  .pager-info b { color: #ffd166; font-size: 15px; }
+  .page-ops { display: flex; gap: 8px; }
+  .page-ops button {
+    border: 1px solid #33364a; background: #12131a; color: #e8e9ef;
+    font-size: 13px; padding: 7px 12px; border-radius: 6px; cursor: pointer;
+  }
+  .page-ops button.danger { color: #ff7b7b; }
+  .page-ops button:hover { border-color: #ffd166; }
+
+  .pos-info { font-size: 12px; color: #9aa0b0; line-height: 1.7; margin-top: 8px; }
+  .pos-info b { color: #57c7ff; }
+  .pos-info i { color: #7ee787; font-style: normal; }
+
+  /* 图片管理 */
+  .img-empty { font-size: 12px; color: #9aa0b0; margin: 6px 0; }
+  .img-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0;
+    font-size: 12px;
+    color: #c4c9d6;
+  }
+  .img-row .thumb {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    object-fit: contain;
+    background: #0f1016;
+    border: 1px solid #2c2f3b;
+    border-radius: 4px;
+    image-rendering: pixelated;
+  }
+  .img-row .nm {
+    width: 70px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .img-row label { color: #9aa0b0; }
+  .img-row input[type="number"] {
+    width: 46px;
+    background: #12131a;
+    border: 1px solid #33364a;
+    border-radius: 5px;
+    color: #e8e9ef;
+    font-size: 12px;
+    padding: 4px 5px;
+    font-family: inherit;
+  }
+  .img-row button {
+    border: 1px solid #33364a;
+    background: #12131a;
+    color: #ff7b7b;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .img-row button:hover { border-color: #ff7b7b; }
+  .img-tip { font-size: 11px; color: #9aa0b0; margin-top: 8px; line-height: 1.6; }
+  #imgInput { display: none; }
+
+  /* 添加小部件弹窗 */
+  #addFolderMask {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 9, 14, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+  }
+  #addFolderMask.show { display: flex; }
+  #addFolderBox {
+    background: #1d1f28;
+    border: 1px solid #2c2f3b;
+    border-radius: 10px;
+    padding: 16px 18px;
+    width: 380px;
+    max-height: 70vh;
+    overflow: auto;
+  }
+  #addFolderBox h3 { margin: 0 0 10px; font-size: 14px; color: #ffd166; letter-spacing: 1px; }
+  .addf-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+    border-bottom: 1px solid #2c2f3b;
+    font-size: 13px;
+    color: #c4c9d6;
+  }
+  .addf-item button {
+    margin-left: auto;
+    border: 1px solid #2c5b3a;
+    background: #14251a;
+    color: #7ee787;
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .addf-item button:hover { border-color: #7ee787; }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%) translateY(20px);
+    background: #3aa675;
+    color: #fff;
+    font-size: 13px;
+    padding: 10px 18px;
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 99;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header>
+  <h1>像素文件夹小部件 · 工作台</h1>
+  <div id="widgetBar">
+    <div id="widgetName">未打开目标</div>
+    <button id="openFileBtn" type="button">打开页面文件夹</button>
+    <button id="pickBtn" type="button">选择小部件文件夹</button>
+  </div>
+  <div id="pageHeader">正在编辑：第 1 / 1 页</div>
+  <div class="spacer"></div>
+  <button id="exportBtn" type="button">保存文字配置</button>
+</header>
+<input type="file" id="folderInput" webkitdirectory directory multiple>
+<input type="file" id="fileInput" accept=".html,text/html">
+
+<main>
+  <section class="canvas-col">
+    <div class="canvas-card">
+      <div class="canvas-tip">在纸张上 <b>拖动</b> 标题框 / 正文框调整位置，<b>拖动四角</b> 调整大小</div>
+      <div id="paperWrap">
+        <img id="paperImg" src="工作台素材/文件_纸.png" alt="">
+        <div id="titleBox" class="tbox">
+          <div class="tlabel">标题</div>
+          <div class="ttext" id="titleBoxText"></div>
+          <i class="h h-nw" data-corner="nw"></i>
+          <i class="h h-ne" data-corner="ne"></i>
+          <i class="h h-sw" data-corner="sw"></i>
+          <i class="h h-se" data-corner="se"></i>
+        </div>
+        <div id="bodyBox" class="bbox">
+          <div class="blabel">正文</div>
+          <div class="btext" id="bodyBoxText"></div>
+          <i class="h h-nw" data-corner="nw"></i>
+          <i class="h h-ne" data-corner="ne"></i>
+          <i class="h h-sw" data-corner="sw"></i>
+          <i class="h h-se" data-corner="se"></i>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <fieldset id="folderField" style="display:none">
+      <legend>页面里的文件夹</legend>
+      <div class="pager">
+        <button id="prevFolderBtn" type="button">◀</button>
+        <div id="folderDots"></div>
+        <button id="nextFolderBtn" type="button">▶</button>
+      </div>
+      <div class="pager-info">当前第 <b id="curFolderNum">1</b> / <span id="totalFolderNum">1</span> 个文件夹</div>
+      <div class="page-ops">
+        <button id="addFolderBtn" type="button">＋ 添加文件夹</button>
+        <button id="upFolderBtn" type="button">↑ 上移</button>
+        <button id="downFolderBtn" type="button">↓ 下移</button>
+        <button id="delFolderBtn" type="button" class="danger">移出页面</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>文件夹 · 颜色与名称</legend>
+      <div class="folder-preview">
+        <img id="fpInner" src="工作台素材/文件夹内.png" alt="">
+        <img id="fpOuter" src="工作台素材/文件夹外.png" alt="">
+        <div id="fpName">文件名.txt</div>
+      </div>
+
+      <div class="swatches">
+        <button class="sw" data-hue="0" style="background:#e8d36a" title="原色"></button>
+        <button class="sw" data-hue="45" style="background:#e8c06a" title="金黄"></button>
+        <button class="sw" data-hue="90" style="background:#aad66a" title="绿"></button>
+        <button class="sw" data-hue="135" style="background:#6ad69a" title="青"></button>
+        <button class="sw" data-hue="180" style="background:#6ad6d0" title="青蓝"></button>
+        <button class="sw" data-hue="225" style="background:#6aaad6" title="蓝"></button>
+        <button class="sw" data-hue="270" style="background:#9a8ae0" title="紫"></button>
+        <button class="sw" data-hue="315" style="background:#e08acb" title="粉"></button>
+        <button id="resetColor" type="button">还原颜色</button>
+      </div>
+
+      <div class="row">
+        <label>色相</label>
+        <input type="range" id="hue" min="0" max="360" step="1">
+        <span class="val" id="hueVal">0</span>
+      </div>
+      <div class="row">
+        <label>饱和度</label>
+        <input type="range" id="sat" min="0" max="200" step="1">
+        <span class="val" id="satVal">100</span>
+      </div>
+      <div class="row">
+        <label>亮度</label>
+        <input type="range" id="bri" min="0" max="200" step="1">
+        <span class="val" id="briVal">100</span>
+      </div>
+
+      <div class="row">
+        <label>名称</label>
+        <input type="text" id="nameInput" value="文件名.txt">
+      </div>
+      <div class="row">
+        <label>名称字号</label>
+        <input type="number" id="nameSizeInput" min="6" max="60" step="1" value="18">
+        <span class="val">px</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>页面</legend>
+      <div class="pager">
+        <button id="prevPageBtn" type="button">◀</button>
+        <div id="pageDots"></div>
+        <button id="nextPageBtn" type="button">▶</button>
+      </div>
+      <div class="pager-info">当前第 <b id="curNum">1</b> / <span id="totalNum">1</span> 页</div>
+      <div class="page-ops">
+        <button id="addPageBtn" type="button">＋ 添加一页</button>
+        <button id="delPageBtn" type="button" class="danger">删除本页</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>当前页内容</legend>
+      <div class="row">
+        <label>标题文字</label>
+        <input type="text" id="titleInput" value="">
+      </div>
+      <div class="row">
+        <label>标题字号</label>
+        <input type="number" id="titleSize" min="6" max="60" step="1" value="18">
+        <span class="val">px</span>
+      </div>
+      <div class="row">
+        <label>正文文字</label>
+        <textarea id="bodyInput"></textarea>
+      </div>
+      <div class="row">
+        <label>正文字号</label>
+        <input type="number" id="bodySize" min="6" max="60" step="1" value="12">
+        <span class="val">px</span>
+      </div>
+      <div class="pos-info" id="posInfo"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>当前页图片</legend>
+      <div id="imgList"></div>
+      <div class="page-ops">
+        <button id="addImgBtn" type="button">＋ 添加图片</button>
+      </div>
+      <div class="img-tip">图片保存在小部件文件夹内的「图片」子文件夹中，不会内嵌进页面。在纸张上拖动粉框移动图片，拖动四角调整大小。</div>
+    </fieldset>
+  </aside>
+</main>
+
+<div id="addFolderMask">
+  <div id="addFolderBox">
+    <h3>添加小部件到页面</h3>
+    <div id="addFolderList"></div>
+    <div class="page-ops" style="margin-top:12px">
+      <button id="addFolderClose" type="button">关闭</button>
+    </div>
+  </div>
+</div>
+<div id="toast">已导出 文字配置.js</div>
+<input type="file" id="imgInput" accept="image/*" multiple>
+
+<script>
+(function () {
+  "use strict";
+
+  var PAPER_W = 444, PAPER_H = 463, MIN = 10;
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function num(v, d) { var n = parseFloat(v); return isNaN(n) ? d : n; }
+  function round(v) { return Math.round(v); }
+
+  function defaultState() {
+    return {
+      folder: { name: "文件名.txt", nameSize: 18, hue: 0, saturation: 100, brightness: 100 },
+      pages: [
+        {
+          title: { text: "タイトル", x: 67, y: 130, w: 310, h: 26, size: 18 },
+          body: { text: "ここに説明文が入ります。", x: 67, y: 180, w: 310, h: 200, size: 12 },
+          images: []
+        }
+      ]
+    };
+  }
+
+  function normalizeImages(arr) {
+    var out = [];
+    if (!arr || !arr.length) { return out; }
+    for (var i = 0; i < arr.length; i++) {
+      var m = arr[i] || {};
+      if (!m.src) { continue; }
+      out.push({ src: String(m.src), x: num(m.x, 10), y: num(m.y, 10), w: num(m.w, 80), h: num(m.h, 80) });
+    }
+    return out;
+  }
+
+  function normalizePage(p) {
+    var t = (p && p.title) ? p.title : {};
+    var b = (p && p.body) ? p.body : {};
+    return {
+      title: { text: (t.text == null) ? "" : String(t.text), x: num(t.x, 67), y: num(t.y, 130), w: num(t.w, 310), h: num(t.h, 26), size: num(t.size, 18) },
+      body:  { text: (b.text == null) ? "" : String(b.text), x: num(b.x, 67), y: num(b.y, 180), w: num(b.w, 310), h: num(b.h, 200), size: num(b.size, 12) },
+      images: normalizeImages(p && p.images)
+    };
+  }
+
+  function normalizeCfg(c) {
+    var f = (c && c.folder) ? c.folder : {};
+    var pages = (c && c.pages && c.pages.length) ? c.pages : defaultState().pages;
+    return {
+      folder: {
+        name: (f.name == null) ? "文件名.txt" : String(f.name),
+        nameSize: num(f.nameSize, 18),
+        hue: num(f.hue, 0),
+        saturation: num(f.saturation, 100),
+        brightness: num(f.brightness, 100)
+      },
+      pages: pages.map(normalizePage)
+    };
+  }
+
+  var state = defaultState();
+  var dirHandle = null; /* 通过系统文件夹选择器拿到的小部件文件夹句柄，可直接写回 */
+  var mode = null; /* "page"=编辑页面文件(index.html) "widget"=编辑小部件配置(文字配置.js) */
+  var folders = [], curFolder = 0; /* 页面文件里的文件夹清单 */
+  var pageFileHandle = null, pageFileName = "", pageText = ""; /* 页面文件状态 */
+  var pageDirHandle = null; /* 页面所在文件夹句柄（组装式页面用） */
+  var pageStyle = null; /* "list"=按 窗口配置.js 组装 "embed"=内嵌 FOLDERS 的旧页面 */
+  var curPage = 0;
+
+  function $(id) { return document.getElementById(id); }
+
+  var titleBox = $("titleBox"), bodyBox = $("bodyBox");
+  var titleBoxText = $("titleBoxText"), bodyBoxText = $("bodyBoxText");
+  var titleInput = $("titleInput"), bodyInput = $("bodyInput");
+  var titleSize = $("titleSize"), bodySize = $("bodySize");
+  var nameInput = $("nameInput"), nameSizeInput = $("nameSizeInput");
+  var hueSl = $("hue"), satSl = $("sat"), briSl = $("bri");
+  var hueVal = $("hueVal"), satVal = $("satVal"), briVal = $("briVal");
+  var curNum = $("curNum"), totalNum = $("totalNum"), pageDots = $("pageDots");
+  var pageHeader = $("pageHeader"), posInfo = $("posInfo");
+  var widgetNameEl = $("widgetName"), pickBtn = $("pickBtn"), folderInput = $("folderInput");
+  var openFileBtn = $("openFileBtn"), fileInput = $("fileInput"), exportBtn = $("exportBtn");
+  var folderField = $("folderField"), folderDots = $("folderDots");
+  var curFolderNum = $("curFolderNum"), totalFolderNum = $("totalFolderNum");
+  var fpInner = $("fpInner"), fpOuter = $("fpOuter"), fpName = $("fpName");
+  var paperWrap = $("paperWrap"), imgList = $("imgList"), addImgBtn = $("addImgBtn"), imgInput = $("imgInput");
+  var addFolderMask = $("addFolderMask"), addFolderList = $("addFolderList");
+
+  /* 图片预览：src → ObjectURL；新增未保存的图片：src → Blob */
+  var imgUrls = {}, imgBlobs = {};
+  function refreshImgUrl(src) {
+    if (imgUrls[src]) {
+      applyImgSrc(src);
+      return;
+    }
+    if (imgBlobs[src]) {
+      imgUrls[src] = URL.createObjectURL(imgBlobs[src]);
+      applyImgSrc(src);
+      return;
+    }
+    if (dirHandle) {
+      dirHandle.getDirectoryHandle("图片").then(function (d) {
+        return d.getFileHandle(src.split("/").pop());
+      }).then(function (fh) {
+        return fh.getFile();
+      }).then(function (file) {
+        imgUrls[src] = URL.createObjectURL(file);
+        applyImgSrc(src);
+      }).catch(function () { /* 文件暂不存在（新增后未保存时），忽略 */ });
+    }
+  }
+  function applyImgSrc(src) {
+    var els = document.querySelectorAll('img[data-isrc="' + src + '"]');
+    for (var i = 0; i < els.length; i++) { els[i].src = imgUrls[src]; }
+  }
+
+  function folderFilter() {
+    var f = state.folder;
+    return "hue-rotate(" + f.hue + "deg) saturate(" + f.saturation + "%) brightness(" + f.brightness + "%)";
+  }
+
+  function renderFolder() {
+    fpInner.style.filter = folderFilter();
+    fpOuter.style.filter = folderFilter();
+    fpName.textContent = state.folder.name;
+    fpName.style.fontSize = Math.max(6, Math.round(state.folder.nameSize * 0.5)) + "px";
+  }
+
+  function applyBox(box, o) {
+    box.style.left = o.x + "px";
+    box.style.top = o.y + "px";
+    box.style.width = o.w + "px";
+    box.style.height = o.h + "px";
+  }
+
+  function renderBoxes() {
+    var p = state.pages[curPage];
+    applyBox(titleBox, p.title);
+    applyBox(bodyBox, p.body);
+    renderBoxText();
+    renderPos();
+  }
+
+  function renderBoxText() {
+    var p = state.pages[curPage];
+    titleBoxText.textContent = p.title.text;
+    titleBoxText.style.fontSize = p.title.size + "px";
+    bodyBoxText.textContent = p.body.text;
+    bodyBoxText.style.fontSize = p.body.size + "px";
+  }
+
+  function renderPos() {
+    var p = state.pages[curPage];
+    posInfo.innerHTML =
+      "标题框 <b>x:" + round(p.title.x) + " y:" + round(p.title.y) + " w:" + round(p.title.w) + " h:" + round(p.title.h) + "</b><br>" +
+      "正文框 <i>x:" + round(p.body.x) + " y:" + round(p.body.y) + " w:" + round(p.body.w) + " h:" + round(p.body.h) + "</i>";
+  }
+
+  /* ---------- 当前页图片 ---------- */
+  function pageImages() {
+    var p = state.pages[curPage];
+    if (!p.images) { p.images = []; }
+    return p.images;
+  }
+
+  function renderImageBoxes() {
+    var olds = paperWrap.querySelectorAll(".ibox");
+    for (var i = 0; i < olds.length; i++) { olds[i].parentNode.removeChild(olds[i]); }
+    var imgs = pageImages();
+    for (var k = 0; k < imgs.length; k++) {
+      (function (im, idx) {
+        var box = document.createElement("div");
+        box.className = "ibox";
+        box.innerHTML =
+          '<div class="ilabel">图' + (idx + 1) + '</div>' +
+          '<img data-isrc="' + im.src + '" alt="">' +
+          '<i class="h h-nw" data-corner="nw"></i>' +
+          '<i class="h h-ne" data-corner="ne"></i>' +
+          '<i class="h h-sw" data-corner="sw"></i>' +
+          '<i class="h h-se" data-corner="se"></i>';
+        applyBox(box, im);
+        paperWrap.appendChild(box);
+        refreshImgUrl(im.src);
+        makeDraggable(box, function () {
+          var o = readBox(box);
+          im.x = o.x; im.y = o.y; im.w = o.w; im.h = o.h;
+          renderImgList();
+        });
+      })(imgs[k], k);
+    }
+  }
+
+  function syncImageBox(idx) {
+    var imgs = pageImages();
+    var boxes = paperWrap.querySelectorAll(".ibox");
+    if (imgs[idx] && boxes[idx]) { applyBox(boxes[idx], imgs[idx]); }
+  }
+
+  function renderImgList() {
+    var imgs = pageImages();
+    if (!imgs.length) {
+      imgList.innerHTML = '<div class="img-empty">本页还没有图片，点下方按钮添加</div>';
+      return;
+    }
+    var html = "";
+    for (var k = 0; k < imgs.length; k++) {
+      var im = imgs[k];
+      html += '<div class="img-row" data-k="' + k + '">' +
+        '<img class="thumb" data-isrc="' + im.src + '" alt="">' +
+        '<span class="nm">' + im.src.split("/").pop() + '</span>' +
+        '<label>x</label><input type="number" class="px" data-f="x" value="' + im.x + '">' +
+        '<label>y</label><input type="number" class="px" data-f="y" value="' + im.y + '">' +
+        '<label>宽</label><input type="number" class="px" data-f="w" value="' + im.w + '">' +
+        '<label>高</label><input type="number" class="px" data-f="h" value="' + im.h + '">' +
+        '<button type="button" class="del">删除</button>' +
+        '</div>';
+    }
+    imgList.innerHTML = html;
+    var rows = imgList.querySelectorAll(".img-row");
+    for (var r = 0; r < rows.length; r++) {
+      (function (row) {
+        var idx = parseInt(row.getAttribute("data-k"), 10);
+        refreshImgUrl(imgs[idx].src);
+        var ins = row.querySelectorAll("input.px");
+        for (var q = 0; q < ins.length; q++) {
+          (function (inp) {
+            inp.addEventListener("change", function () {
+              var f = inp.getAttribute("data-f");
+              imgs[idx][f] = clamp(round(num(inp.value, imgs[idx][f])), f === "x" || f === "y" ? 0 : MIN, f === "x" || f === "y" ? (f === "x" ? PAPER_W : PAPER_H) : PAPER_W);
+              inp.value = imgs[idx][f];
+              syncImageBox(idx);
+            });
+          })(ins[q]);
+        }
+        row.querySelector(".del").addEventListener("click", function () { deleteImage(idx); });
+      })(rows[r]);
+    }
+  }
+
+  async function saveImageToDir(name, blob) {
+    var dir = await dirHandle.getDirectoryHandle("图片", { create: true });
+    var fh = await dir.getFileHandle(name, { create: true });
+    var w = await fh.createWritable();
+    await w.write(blob);
+    await w.close();
+  }
+
+  function allUsedSrc() {
+    var used = {};
+    for (var i = 0; i < state.pages.length; i++) {
+      var imgs = state.pages[i].images || [];
+      for (var k = 0; k < imgs.length; k++) { used[imgs[k].src] = true; }
+    }
+    return used;
+  }
+
+  function loadImgSize(blob) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(blob);
+      var im = new Image();
+      im.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve({ w: im.naturalWidth || 80, h: im.naturalHeight || 80 });
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); resolve({ w: 80, h: 80 }); };
+      im.src = url;
+    });
+  }
+
+  function addImages(files) {
+    if (!dirHandle) {
+      showToast("请先用「选择小部件文件夹」打开小部件文件夹，才能保存图片");
+      return;
+    }
+    var used = allUsedSrc();
+    var chain = Promise.resolve();
+    for (var i = 0; i < files.length; i++) {
+      (function (file) {
+        chain = chain.then(async function () {
+          var name = file.name;
+          var src = "图片/" + name;
+          if (used[src] && !imgBlobs[src]) {
+            var dot = name.lastIndexOf(".");
+            var base = dot > 0 ? name.slice(0, dot) : name;
+            var ext = dot > 0 ? name.slice(dot) : "";
+            var n = 2;
+            while (used["图片/" + base + " (" + n + ")" + ext]) { n++; }
+            name = base + " (" + n + ")" + ext;
+            src = "图片/" + name;
+          }
+          try { await saveImageToDir(name, file); } catch (e) {
+            showToast("图片保存失败：" + name);
+            return;
+          }
+          used[src] = true;
+          imgBlobs[src] = file;
+          var sz = await loadImgSize(file);
+          var w = clamp(round(sz.w), MIN, PAPER_W);
+          var h = clamp(round(w * sz.h / (sz.w || 1)), MIN, PAPER_H);
+          pageImages().push({ src: src, x: 10, y: 10, w: w, h: h });
+          renderImageBoxes();
+          renderImgList();
+        });
+      })(files[i]);
+    }
+  }
+
+  function deleteImage(idx) {
+    var imgs = pageImages();
+    var im = imgs[idx];
+    if (!im) { return; }
+    imgs.splice(idx, 1);
+    if (dirHandle) {
+      dirHandle.getDirectoryHandle("图片").then(function (d) {
+        return d.getFileHandle(im.src.split("/").pop());
+      }).then(function (fh) {
+        if (fh.remove) { return fh.remove(); }
+      }).catch(function () { /* 文件已不存在则忽略 */ });
+    }
+    var stillUsed = false;
+    for (var i = 0; i < state.pages.length; i++) {
+      var arr = state.pages[i].images || [];
+      for (var k = 0; k < arr.length; k++) { if (arr[k].src === im.src) { stillUsed = true; break; } }
+    }
+    if (!stillUsed) {
+      if (imgUrls[im.src]) { URL.revokeObjectURL(imgUrls[im.src]); }
+      delete imgUrls[im.src];
+      delete imgBlobs[im.src];
+    }
+    renderImageBoxes();
+    renderImgList();
+  }
+
+  function renderInputs() {
+    var p = state.pages[curPage], f = state.folder;
+    nameInput.value = f.name;
+    nameSizeInput.value = f.nameSize;
+    hueSl.value = f.hue; satSl.value = f.saturation; briSl.value = f.brightness;
+    hueVal.textContent = f.hue; satVal.textContent = f.saturation; briVal.textContent = f.brightness;
+    titleInput.value = p.title.text;
+    bodyInput.value = p.body.text;
+    titleSize.value = p.title.size;
+    bodySize.value = p.body.size;
+    renderSwatches();
+  }
+
+  function renderSwatches() {
+    var sws = document.querySelectorAll(".sw");
+    for (var i = 0; i < sws.length; i++) {
+      var hue = parseInt(sws[i].getAttribute("data-hue"), 10);
+      sws[i].classList.toggle("on", (hue === state.folder.hue && state.folder.saturation === 100 && state.folder.brightness === 100));
+    }
+  }
+
+  function renderPager() {
+    curNum.textContent = curPage + 1;
+    totalNum.textContent = state.pages.length;
+    pageHeader.textContent = "正在编辑：第 " + (curPage + 1) + " / " + state.pages.length + " 页";
+    var html = "";
+    for (var i = 0; i < state.pages.length; i++) {
+      html += '<span class="dot' + (i === curPage ? " on" : "") + '" data-i="' + i + '">' + (i + 1) + '</span>';
+    }
+    pageDots.innerHTML = html;
+    var dots = pageDots.querySelectorAll(".dot");
+    for (var j = 0; j < dots.length; j++) {
+      (function (d) {
+        d.addEventListener("click", function () {
+          var idx = parseInt(d.getAttribute("data-i"), 10);
+          goPage(idx);
+        });
+      })(dots[j]);
+    }
+  }
+
+  function renderAll() {
+    renderFolder();
+    renderInputs();
+    renderBoxes();
+    renderPager();
+    renderFolderDots();
+    renderImageBoxes();
+    renderImgList();
+  }
+
+  function goPage(i) {
+    if (i < 0 || i >= state.pages.length) { return; }
+    curPage = i;
+    renderAll();
+  }
+
+  /* ---------- 编辑控件事件 ---------- */
+  titleInput.addEventListener("input", function () {
+    state.pages[curPage].title.text = titleInput.value;
+    renderBoxText();
+  });
+  bodyInput.addEventListener("input", function () {
+    state.pages[curPage].body.text = bodyInput.value;
+    renderBoxText();
+  });
+  titleSize.addEventListener("input", function () {
+    state.pages[curPage].title.size = num(titleSize.value, 18);
+    renderBoxText();
+  });
+  bodySize.addEventListener("input", function () {
+    state.pages[curPage].body.size = num(bodySize.value, 12);
+    renderBoxText();
+  });
+  nameInput.addEventListener("input", function () {
+    state.folder.name = nameInput.value;
+    renderFolder();
+  });
+  nameSizeInput.addEventListener("input", function () {
+    state.folder.nameSize = num(nameSizeInput.value, 18);
+    renderFolder();
+  });
+  hueSl.addEventListener("input", function () {
+    state.folder.hue = num(hueSl.value, 0);
+    hueVal.textContent = state.folder.hue;
+    renderFolder(); renderSwatches();
+  });
+  satSl.addEventListener("input", function () {
+    state.folder.saturation = num(satSl.value, 100);
+    satVal.textContent = state.folder.saturation;
+    renderFolder(); renderSwatches();
+  });
+  briSl.addEventListener("input", function () {
+    state.folder.brightness = num(briSl.value, 100);
+    briVal.textContent = state.folder.brightness;
+    renderFolder(); renderSwatches();
+  });
+  var sws = document.querySelectorAll(".sw");
+  for (var si = 0; si < sws.length; si++) {
+    (function (sw) {
+      sw.addEventListener("click", function () {
+        state.folder.hue = parseInt(sw.getAttribute("data-hue"), 10);
+        state.folder.saturation = 100;
+        state.folder.brightness = 100;
+        renderAll();
+      });
+    })(sws[si]);
+  }
+  $("resetColor").addEventListener("click", function () {
+    state.folder.hue = 0;
+    state.folder.saturation = 100;
+    state.folder.brightness = 100;
+    renderAll();
+  });
+
+  $("prevPageBtn").addEventListener("click", function () { goPage(curPage - 1); });
+  $("nextPageBtn").addEventListener("click", function () { goPage(curPage + 1); });
+  $("addPageBtn").addEventListener("click", function () {
+    var last = state.pages[state.pages.length - 1];
+    var np = {
+      title: { text: "", x: last.title.x, y: last.title.y, w: last.title.w, h: last.title.h, size: last.title.size },
+      body: { text: "", x: last.body.x, y: last.body.y, w: last.body.w, h: last.body.h, size: last.body.size },
+      images: JSON.parse(JSON.stringify(last.images || []))
+    };
+    state.pages.push(np);
+    curPage = state.pages.length - 1;
+    renderAll();
+  });
+  $("delPageBtn").addEventListener("click", function () {
+    if (state.pages.length <= 1) { return; }
+    state.pages.splice(curPage, 1);
+    if (curPage >= state.pages.length) { curPage = state.pages.length - 1; }
+    renderAll();
+  });
+
+  /* ---------- 图片添加 ---------- */
+  addImgBtn.addEventListener("click", function () {
+    if (!dirHandle) {
+      showToast("请先用「选择小部件文件夹」打开小部件文件夹，才能保存图片");
+      return;
+    }
+    imgInput.value = "";
+    imgInput.click();
+  });
+  imgInput.addEventListener("change", function () {
+    var files = imgInput.files;
+    if (!files || !files.length) { return; }
+    addImages(Array.prototype.slice.call(files));
+  });
+
+  /* ---------- 拖拽 / 缩放 ---------- */
+  function makeDraggable(box, onCommit) {
+    var drag = null;
+    box.addEventListener("pointerdown", function (e) {
+      var hl = (e.target && e.target.closest) ? e.target.closest(".h") : null;
+      if (hl) { drag = { type: "resize", corner: hl.getAttribute("data-corner") }; }
+      else { drag = { type: "move" }; }
+      e.preventDefault();
+      drag.sx = e.clientX; drag.sy = e.clientY;
+      drag.ox = parseFloat(box.style.left) || 0;
+      drag.oy = parseFloat(box.style.top) || 0;
+      drag.ow = parseFloat(box.style.width) || 0;
+      drag.oh = parseFloat(box.style.height) || 0;
+      if (box.setPointerCapture) { box.setPointerCapture(e.pointerId); }
+    });
+    box.addEventListener("pointermove", function (e) {
+      if (!drag) { return; }
+      var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+      if (drag.type === "move") {
+        var nx = clamp(drag.ox + dx, 0, PAPER_W - drag.ow);
+        var ny = clamp(drag.oy + dy, 0, PAPER_H - drag.oh);
+        box.style.left = nx + "px";
+        box.style.top = ny + "px";
+      } else {
+        var c = drag.corner;
+        var L = drag.ox, T = drag.oy, R = drag.ox + drag.ow, B = drag.oy + drag.oh;
+        if (c.indexOf("w") >= 0) { L = clamp(drag.ox + dx, 0, R - MIN); }
+        if (c.indexOf("e") >= 0) { R = clamp(drag.ox + drag.ow + dx, L + MIN, PAPER_W); }
+        if (c.indexOf("n") >= 0) { T = clamp(drag.oy + dy, 0, B - MIN); }
+        if (c.indexOf("s") >= 0) { B = clamp(drag.oy + drag.oh + dy, T + MIN, PAPER_H); }
+        box.style.left = L + "px";
+        box.style.top = T + "px";
+        box.style.width = (R - L) + "px";
+        box.style.height = (B - T) + "px";
+      }
+    });
+    function end() {
+      if (!drag) { return; }
+      drag = null;
+      onCommit();
+    }
+    box.addEventListener("pointerup", end);
+    box.addEventListener("pointercancel", end);
+  }
+
+  function readBox(box) {
+    return {
+      x: clamp(round(parseFloat(box.style.left) || 0), 0, PAPER_W),
+      y: clamp(round(parseFloat(box.style.top) || 0), 0, PAPER_H),
+      w: clamp(round(parseFloat(box.style.width) || 0), MIN, PAPER_W),
+      h: clamp(round(parseFloat(box.style.height) || 0), MIN, PAPER_H)
+    };
+  }
+  function commitTitle() {
+    var o = readBox(titleBox);
+    var t = state.pages[curPage].title;
+    t.x = o.x; t.y = o.y; t.w = o.w; t.h = o.h;
+    renderPos();
+  }
+  function commitBody() {
+    var o = readBox(bodyBox);
+    var b = state.pages[curPage].body;
+    b.x = o.x; b.y = o.y; b.w = o.w; b.h = o.h;
+    renderPos();
+  }
+  makeDraggable(titleBox, commitTitle);
+  makeDraggable(bodyBox, commitBody);
+
+  /* ---------- 导出 ---------- */
+  function buildConfig() {
+    return {
+      folder: {
+        name: state.folder.name,
+        nameSize: state.folder.nameSize,
+        hue: state.folder.hue,
+        saturation: state.folder.saturation,
+        brightness: state.folder.brightness
+      },
+      pages: state.pages.map(function (p) {
+        return {
+          title: { text: p.title.text, x: p.title.x, y: p.title.y, w: p.title.w, h: p.title.h, size: p.title.size },
+          body: { text: p.body.text, x: p.body.x, y: p.body.y, w: p.body.w, h: p.body.h, size: p.body.size },
+          images: (p.images || []).map(function (m) { return { src: m.src, x: m.x, y: m.y, w: m.w, h: m.h }; })
+        };
+      })
+    };
+  }
+
+  function showToast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(function () { t.classList.remove("show"); }, 2200);
+  }
+
+  exportBtn.addEventListener("click", async function () {
+    if (mode === "page") { await savePage(); return; }
+    var cfg = buildConfig();
+    var header = "/* =========================================================\n" +
+                 "   像素文件夹小部件 · 文字与样式配置（由工作台导出）\n" +
+                 "   将此文件放到 基础部件.html 同目录即可，无需改动基础部件\n" +
+                 "   ========================================================= */\n";
+    var content = header + "window.WIDGET_TEXT = " + JSON.stringify(cfg, null, 2) + ";\n";
+    if (dirHandle) {
+      try {
+        var fh = await dirHandle.getFileHandle("文字配置.js", { create: true });
+        var w = await fh.createWritable();
+        await w.write(content);
+        await w.close();
+        showToast("已保存到文件夹：" + dirHandle.name);
+        return;
+      } catch (e) { /* 写入失败则改为下载 */ }
+    }
+    var blob = new Blob([content], { type: "text/javascript;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "文字配置.js";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    showToast("已导出 文字配置.js，请放到 基础部件.html 同目录");
+  });
+
+  /* ---------- 小部件选择 ---------- */
+  function applyConfig(cfg, label, handle) {
+    for (var k in imgUrls) { URL.revokeObjectURL(imgUrls[k]); }
+    imgUrls = {};
+    imgBlobs = {};
+    mode = "widget";
+    state = normalizeCfg(cfg);
+    curPage = 0;
+    dirHandle = handle || null;
+    folderField.style.display = "none";
+    exportBtn.textContent = "保存文字配置";
+    widgetNameEl.textContent = label;
+    widgetNameEl.title = label;
+    renderAll();
+  }
+
+  function parseConfigText(text) {
+    var m = text.match(/window\.WIDGET_TEXT\s*=\s*([\s\S]*?)\s*;?\s*$/);
+    if (!m) { return null; }
+    try { return JSON.parse(m[1]); } catch (e) { return null; }
+  }
+
+  function tryLoadScript(src) {
+    return new Promise(function (resolve) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function () { resolve(true); };
+      s.onerror = function () { resolve(false); };
+      document.head.appendChild(s);
+    });
+  }
+
+  /* 自动识别：工作台若放在某个小部件文件夹内，直接读取同目录的配置文件 */
+  async function autoDetect() {
+    var names = ["文字配置.js", "widget-text.js"];
+    for (var i = 0; i < names.length; i++) {
+      var ok = await tryLoadScript(names[i]);
+      if (ok && window.WIDGET_TEXT) {
+        var parts = location.pathname.replace(/[\\/]+$/, "").split(/[\\/]/).filter(Boolean);
+        var folderName = parts.length >= 2 ? decodeURIComponent(parts[parts.length - 2]) : "";
+        applyConfig(window.WIDGET_TEXT, folderName || "当前文件夹", null);
+        return;
+      }
+    }
+  }
+
+  /* 从系统文件夹选择器拿到的句柄中读取配置 */
+  async function readConfigFromDir(handle) {
+    var names = ["文字配置.js", "widget-text.js"];
+    for (var i = 0; i < names.length; i++) {
+      try {
+        var fh = await handle.getFileHandle(names[i]);
+        var file = await fh.getFile();
+        return parseConfigText(await file.text());
+      } catch (e) { /* 尝试下一个文件名 */ }
+    }
+    return null;
+  }
+
+  /* ---------- 组装式页面：按 窗口配置.js + 各小部件 文字配置.js 读写 ---------- */
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function parsePageWidgetsText(text) {
+    var m = text.match(/window\.PAGE_WIDGETS\s*=\s*([\s\S]*?)\s*;\s*$/);
+    if (!m) { return null; }
+    try {
+      var arr = (new Function("return (" + m[1] + ");"))();
+      return (arr && arr.length) ? arr : null;
+    } catch (e) { return null; }
+  }
+
+  /* 把 dirHandle 切到当前小部件文件夹（图片功能需要），并清掉旧图片缓存 */
+  async function openFolderDirHandle(i) {
+    for (var k in imgUrls) { URL.revokeObjectURL(imgUrls[k]); }
+    imgUrls = {};
+    imgBlobs = {};
+    dirHandle = null;
+    if (!pageDirHandle || !folders[i] || !folders[i].dir) { return; }
+    try {
+      var wh = await pageDirHandle.getDirectoryHandle("小部件");
+      dirHandle = await wh.getDirectoryHandle(folders[i].dir);
+    } catch (e) { /* 文件夹不存在则保持 null */ }
+  }
+
+  function folderToConfig(f) {
+    return {
+      folder: {
+        name: f.name, nameSize: f.nameSize, hue: f.hue,
+        saturation: f.saturation, brightness: f.brightness
+      },
+      pages: f.pages.map(function (p) {
+        return {
+          title: { text: p.title.text, x: p.title.x, y: p.title.y, w: p.title.w, h: p.title.h, size: p.title.size },
+          body: { text: p.body.text, x: p.body.x, y: p.body.y, w: p.body.w, h: p.body.h, size: p.body.size },
+          images: (p.images || []).map(function (m) { return { src: m.src, x: m.x, y: m.y, w: m.w, h: m.h }; })
+        };
+      })
+    };
+  }
+
+  function formatWidgetConfig(f) {
+    var header = "/* =========================================================\n" +
+                 "   像素文件夹小部件 · 文字与样式配置（由工作台导出）\n" +
+                 "   将此文件放到 基础部件.html 同目录即可，无需改动基础部件\n" +
+                 "   ========================================================= */\n";
+    return header + "window.WIDGET_TEXT = " + JSON.stringify(folderToConfig(f), null, 2) + ";\n";
+  }
+
+  function formatPageWidgets(list) {
+    var dirs = [];
+    for (var i = 0; i < list.length; i++) { dirs.push(list[i].dir); }
+    var header = "/* =========================================================\n" +
+                 "   页面小部件清单（由工作台维护，也可手动修改）\n" +
+                 "   按顺序填写「小部件」文件夹里的文件夹名，\n" +
+                 "   页面会按这里的顺序从左到右显示对应的小部件。\n" +
+                 "   新增小部件：把小部件文件夹放进「小部件」里，再在这里加一行。\n" +
+                 "   ========================================================= */\n";
+    return header + "window.PAGE_WIDGETS = " + JSON.stringify(dirs, null, 2) + ";\n";
+  }
+
+  /* 打开页面文件夹：优先按 窗口配置.js 组装，没有则退回旧版内嵌 index.html */
+  async function openPageFolder(handle) {
+    var dirs = null;
+    try {
+      var fh = await handle.getFileHandle("窗口配置.js");
+      dirs = parsePageWidgetsText(await (await fh.getFile()).text());
+    } catch (e) { /* 没有清单文件 */ }
+    if (dirs) {
+      var list = [];
+      for (var i = 0; i < dirs.length; i++) {
+        var dir = String(dirs[i]);
+        var cfg = null;
+        try {
+          var wh = await handle.getDirectoryHandle("小部件");
+          cfg = await readConfigFromDir(await wh.getDirectoryHandle(dir));
+        } catch (e) { /* 该小部件文件夹不存在，按默认配置显示 */ }
+        var c = normalizeCfg(cfg || defaultState());
+        c.dir = dir;
+        list.push(c);
+      }
+      mode = "page";
+      pageStyle = "list";
+      pageDirHandle = handle;
+      pageFileHandle = null;
+      pageFileName = handle.name;
+      pageText = "";
+      folders = list;
+      curFolder = 0;
+      folderField.style.display = "";
+      exportBtn.textContent = "保存到页面文件夹";
+      widgetNameEl.textContent = "页面：" + handle.name;
+      widgetNameEl.title = handle.name;
+      await openFolderDirHandle(0);
+      loadFolderIntoState(0);
+      renderAll();
+      showToast("已读取 " + folders.length + " 个小部件，改完点右上角保存");
+      return;
+    }
+    try {
+      var ifh = await handle.getFileHandle("index.html");
+      await openPageFile(ifh, await ifh.getFile());
+      return;
+    } catch (e) { /* 没有 index.html */ }
+    showToast("这个文件夹里既没有 窗口配置.js 也没有 index.html");
+  }
+
+  /* 添加小部件弹窗：列出 小部件 里还没加进页面的文件夹 */
+  async function showAddFolderPicker() {
+    if (!pageDirHandle) { return; }
+    var subdirs = [];
+    try {
+      var wh = await pageDirHandle.getDirectoryHandle("小部件");
+      for await (var name of wh.keys()) {
+        try { await wh.getDirectoryHandle(name); subdirs.push(name); } catch (e) { /* 不是文件夹 */ }
+      }
+    } catch (e) { /* 没有小部件目录 */ }
+    subdirs.sort();
+    var used = {};
+    for (var i = 0; i < folders.length; i++) { used[folders[i].dir] = true; }
+    var html = "";
+    for (var j = 0; j < subdirs.length; j++) {
+      if (used[subdirs[j]]) { continue; }
+      html += '<div class="addf-item"><span>' + esc(subdirs[j]) + '</span><button type="button" data-dir="' + esc(subdirs[j]) + '">添加</button></div>';
+    }
+    if (!html) { html = '<div class="addf-item"><span>小部件文件夹都已经在页面里了</span></div>'; }
+    html += '<div class="addf-item"><span>没有想要的？</span><button type="button" id="addfNew">＋ 新建小部件文件夹</button></div>';
+    addFolderList.innerHTML = html;
+    addFolderMask.classList.add("show");
+  }
+
+  async function addFolderByDir(dir) {
+    var cfg = null;
+    try {
+      var wh = await pageDirHandle.getDirectoryHandle("小部件");
+      cfg = await readConfigFromDir(await wh.getDirectoryHandle(dir));
+    } catch (e) { /* 无配置则按默认 */ }
+    var c = normalizeCfg(cfg || defaultState());
+    c.dir = dir;
+    syncStateToFolder();
+    folders.splice(curFolder + 1, 0, c);
+    curFolder = curFolder + 1;
+    await openFolderDirHandle(curFolder);
+    loadFolderIntoState(curFolder);
+    addFolderMask.classList.remove("show");
+    renderAll();
+    showToast("已添加小部件：" + dir);
+  }
+
+  async function createWidgetFolder() {
+    var name = window.prompt("新小部件文件夹名称（会建在「小部件」文件夹里）：", "03_新部件");
+    if (name == null) { return; }
+    name = name.replace(/[\\/:*?"<>|]/g, "").trim();
+    if (!name) { showToast("名称无效"); return; }
+    try {
+      var wh = await pageDirHandle.getDirectoryHandle("小部件", { create: true });
+      var wdh = await wh.getDirectoryHandle(name, { create: true });
+      var fh = await wdh.getFileHandle("文字配置.js", { create: true });
+      var w = await fh.createWritable();
+      await w.write(formatWidgetConfig(normalizeCfg(defaultState())));
+      await w.close();
+      await addFolderByDir(name);
+    } catch (e) {
+      showToast("新建失败：" + (e && e.message ? e.message : e));
+    }
+  }
+
+  /* ---------- 页面文件模式（直接读写 index.html 里的 FOLDERS 清单） ---------- */
+  function normalizeFolderList(arr) {
+    var out = [];
+    for (var i = 0; i < arr.length; i++) {
+      var c = normalizeCfg({ folder: arr[i], pages: arr[i] && arr[i].pages });
+      out.push({
+        name: c.folder.name, nameSize: c.folder.nameSize, hue: c.folder.hue,
+        saturation: c.folder.saturation, brightness: c.folder.brightness,
+        pages: c.pages
+      });
+    }
+    return out;
+  }
+
+  function parseFoldersFromText(text) {
+    var m = text.match(/var FOLDERS = (\[[\s\S]*?\n  \]);/);
+    if (!m) { return null; }
+    try {
+      var arr = (new Function("return (" + m[1] + ");"))();
+      if (!arr || !arr.length) { return null; }
+      return normalizeFolderList(arr);
+    } catch (e) { return null; }
+  }
+
+  /* 按原文件风格生成 FOLDERS 清单代码（2空格缩进、字段单行） */
+  function formatBox(o) {
+    return "{ text: " + JSON.stringify(o.text) + ", x: " + o.x + ", y: " + o.y +
+           ", w: " + o.w + ", h: " + o.h + ", size: " + o.size + " }";
+  }
+  function formatFolders(list) {
+    var out = "[\n";
+    for (var i = 0; i < list.length; i++) {
+      var f = list[i];
+      out += "    {\n";
+      out += "      name: " + JSON.stringify(f.name) + ",\n";
+      out += "      nameSize: " + f.nameSize + ",\n";
+      out += "      hue: " + f.hue + ",\n";
+      out += "      saturation: " + f.saturation + ",\n";
+      out += "      brightness: " + f.brightness + ",\n";
+      out += "      pages: [\n";
+      for (var j = 0; j < f.pages.length; j++) {
+        var p = f.pages[j];
+        out += "        {\n";
+        out += "          title: " + formatBox(p.title) + ",\n";
+        out += "          body: " + formatBox(p.body) + "\n";
+        out += "        }" + (j < f.pages.length - 1 ? "," : "") + "\n";
+      }
+      out += "      ]\n";
+      out += "    }" + (i < list.length - 1 ? "," : "") + "\n";
+    }
+    out += "  ]";
+    return out;
+  }
+
+  function spliceFoldersText(text, block) {
+    return text.replace(/var FOLDERS = \[[\s\S]*?\n  \];/, "var FOLDERS = " + block + ";");
+  }
+
+  function syncStateToFolder() {
+    if (mode !== "page" || !folders[curFolder]) { return; }
+    var c = buildConfig();
+    var f = folders[curFolder];
+    f.name = c.folder.name; f.nameSize = c.folder.nameSize; f.hue = c.folder.hue;
+    f.saturation = c.folder.saturation; f.brightness = c.folder.brightness;
+    f.pages = c.pages;
+  }
+
+  function loadFolderIntoState(i) {
+    var f = folders[i];
+    state = {
+      folder: { name: f.name, nameSize: f.nameSize, hue: f.hue, saturation: f.saturation, brightness: f.brightness },
+      pages: f.pages
+    };
+    curPage = 0;
+  }
+
+  function goFolder(i) {
+    if (i < 0 || i >= folders.length) { return; }
+    syncStateToFolder();
+    curFolder = i;
+    loadFolderIntoState(i);
+    if (pageDirHandle && folders[i] && folders[i].dir) {
+      openFolderDirHandle(i).then(function () { renderAll(); });
+    } else {
+      renderAll();
+    }
+  }
+
+  function renderFolderDots() {
+    if (mode !== "page") { return; }
+    curFolderNum.textContent = curFolder + 1;
+    totalFolderNum.textContent = folders.length;
+    widgetNameEl.textContent = "页面：" + pageFileName + " · 文件夹 " + (curFolder + 1) + "/" + folders.length;
+    var html = "";
+    for (var i = 0; i < folders.length; i++) {
+      html += '<span class="dot' + (i === curFolder ? " on" : "") + '" data-fi="' + i + '">' + (i + 1) + "</span>";
+    }
+    folderDots.innerHTML = html;
+    var ds = folderDots.querySelectorAll(".dot");
+    for (var j = 0; j < ds.length; j++) {
+      (function (d) {
+        d.addEventListener("click", function () {
+          goFolder(parseInt(d.getAttribute("data-fi"), 10));
+        });
+      })(ds[j]);
+    }
+  }
+
+  async function openPageFile(handle, file) {
+    var text = await file.text();
+    var list = parseFoldersFromText(text);
+    if (!list) {
+      showToast("这个文件里没有找到文件夹清单，它不是可编辑的页面文件");
+      return;
+    }
+    mode = "page";
+    pageStyle = "embed";
+    pageDirHandle = null;
+    dirHandle = null;
+    pageFileHandle = handle || null;
+    pageFileName = file.name;
+    pageText = text;
+    folders = list;
+    curFolder = 0;
+    loadFolderIntoState(0);
+    folderField.style.display = "";
+    exportBtn.textContent = "保存到 " + pageFileName;
+    widgetNameEl.textContent = "页面：" + pageFileName;
+    widgetNameEl.title = pageFileName;
+    renderAll();
+    showToast("已读取 " + folders.length + " 个文件夹，改完点右上角保存");
+  }
+
+  async function savePage() {
+    syncStateToFolder();
+    if (pageStyle === "list" && pageDirHandle) {
+      try {
+        var wh = await pageDirHandle.getDirectoryHandle("小部件", { create: true });
+        for (var i = 0; i < folders.length; i++) {
+          var wdh = await wh.getDirectoryHandle(folders[i].dir, { create: true });
+          var fh = await wdh.getFileHandle("文字配置.js", { create: true });
+          var w = await fh.createWritable();
+          await w.write(formatWidgetConfig(folders[i]));
+          await w.close();
+        }
+        var pfh = await pageDirHandle.getFileHandle("窗口配置.js", { create: true });
+        var pww = await pfh.createWritable();
+        await pww.write(formatPageWidgets(folders));
+        await pww.close();
+        showToast("已保存 " + folders.length + " 个小部件配置和页面清单");
+        return;
+      } catch (e) {
+        showToast("保存失败：" + (e && e.message ? e.message : e));
+        return;
+      }
+    }
+    var newText = spliceFoldersText(pageText, formatFolders(folders));
+    pageText = newText;
+    if (pageFileHandle) {
+      try {
+        var w = await pageFileHandle.createWritable();
+        await w.write(newText);
+        await w.close();
+        showToast("已保存到 " + pageFileName);
+        return;
+      } catch (e) { /* 写入失败改为下载 */ }
+    }
+    var blob = new Blob([newText], { type: "text/html;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = pageFileName || "index.html";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    showToast("已下载修改后的文件，用它替换原来的 " + (pageFileName || "index.html"));
+  }
+
+  openFileBtn.addEventListener("click", async function () {
+    if (window.showDirectoryPicker) {
+      try {
+        var h = await window.showDirectoryPicker({ mode: "readwrite" });
+        await openPageFolder(h);
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") { return; }
+        /* 选择器不可用时降级到文件选择输入框（旧版内嵌页面，只读，保存时改为下载） */
+      }
+    }
+    fileInput.value = "";
+    fileInput.click();
+  });
+  fileInput.addEventListener("change", function () {
+    var f = fileInput.files && fileInput.files[0];
+    if (!f) { return; }
+    openPageFile(null, f);
+  });
+
+  $("prevFolderBtn").addEventListener("click", function () { goFolder(curFolder - 1); });
+  $("nextFolderBtn").addEventListener("click", function () { goFolder(curFolder + 1); });
+  $("addFolderBtn").addEventListener("click", function () {
+    syncStateToFolder();
+    if (pageStyle === "list" && pageDirHandle) { showAddFolderPicker(); return; }
+    var copy = JSON.parse(JSON.stringify(folders[curFolder]));
+    copy.name = "新文件夹";
+    folders.splice(curFolder + 1, 0, copy);
+    curFolder = curFolder + 1;
+    loadFolderIntoState(curFolder);
+    renderAll();
+    showToast("已添加文件夹 " + (curFolder + 1) + "，请修改名称和内容");
+  });
+  $("delFolderBtn").addEventListener("click", function () {
+    if (folders.length <= 1) { showToast("至少保留一个文件夹"); return; }
+    var msg = folders[curFolder].dir
+      ? "确定把「" + folders[curFolder].name + "」从页面移除吗？（磁盘上的文件不会删除）"
+      : "确定删除文件夹「" + folders[curFolder].name + "」吗？";
+    if (!window.confirm(msg)) { return; }
+    folders.splice(curFolder, 1);
+    if (curFolder >= folders.length) { curFolder = folders.length - 1; }
+    loadFolderIntoState(curFolder);
+    if (pageDirHandle && folders[curFolder] && folders[curFolder].dir) {
+      openFolderDirHandle(curFolder).then(function () { renderAll(); });
+    } else {
+      renderAll();
+    }
+  });
+  $("upFolderBtn").addEventListener("click", function () {
+    if (curFolder <= 0) { return; }
+    syncStateToFolder();
+    var t = folders[curFolder - 1];
+    folders[curFolder - 1] = folders[curFolder];
+    folders[curFolder] = t;
+    curFolder--;
+    loadFolderIntoState(curFolder);
+    renderAll();
+  });
+  $("downFolderBtn").addEventListener("click", function () {
+    if (curFolder >= folders.length - 1) { return; }
+    syncStateToFolder();
+    var t = folders[curFolder + 1];
+    folders[curFolder + 1] = folders[curFolder];
+    folders[curFolder] = t;
+    curFolder++;
+    loadFolderIntoState(curFolder);
+    renderAll();
+  });
+  $("addFolderClose").addEventListener("click", function () { addFolderMask.classList.remove("show"); });
+  addFolderMask.addEventListener("click", function (e) {
+    if (e.target === addFolderMask) { addFolderMask.classList.remove("show"); }
+  });
+  addFolderList.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("button") : null;
+    if (!b) { return; }
+    if (b.id === "addfNew") { createWidgetFolder(); return; }
+    var dir = b.getAttribute("data-dir");
+    if (dir) { addFolderByDir(dir); }
+  });
+
+  pickBtn.addEventListener("click", async function () {
+    if (window.showDirectoryPicker) {
+      try {
+        var h = await window.showDirectoryPicker({ mode: "readwrite" });
+        var cfg = await readConfigFromDir(h);
+        if (cfg) {
+          applyConfig(cfg, h.name, h);
+          showToast("已读取小部件：" + h.name);
+        } else {
+          applyConfig(defaultState(), h.name + "（新建配置）", h);
+          showToast("未找到配置，保存时将在该文件夹新建 文字配置.js");
+        }
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") { return; }
+        /* 选择器不可用时降级到文件夹选择输入框 */
+      }
+    }
+    folderInput.value = "";
+    folderInput.click();
+  });
+
+  /* 降级方案：用 <input type="file" webkitdirectory> 选择小部件文件夹（只读，保存时改为下载） */
+  folderInput.addEventListener("change", function () {
+    var files = folderInput.files;
+    if (!files || !files.length) { return; }
+    var found = null;
+    for (var i = 0; i < files.length; i++) {
+      var n = files[i].name;
+      if (n === "文字配置.js" || n === "widget-text.js") { found = files[i]; break; }
+    }
+    var rel = files[0].webkitRelativePath || "";
+    var folderName = rel.split("/")[0] || "所选文件夹";
+    if (found) {
+      found.text().then(function (text) {
+        var cfg = parseConfigText(text);
+        if (cfg) {
+          applyConfig(cfg, folderName, null);
+          showToast("已读取小部件：" + folderName);
+        } else {
+          applyConfig(defaultState(), folderName, null);
+          showToast("配置文件解析失败，已载入默认内容");
+        }
+      });
+    } else {
+      applyConfig(defaultState(), folderName + "（新建配置）", null);
+      showToast("未找到配置，保存时将下载新的 文字配置.js");
+    }
+  });
+
+  renderAll();
+  autoDetect();
+})();
+</script>
+</body>
+</html>

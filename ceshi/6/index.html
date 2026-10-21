@@ -1,0 +1,2731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>像素人物交互地图</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #171b20;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "Microsoft YaHei", sans-serif;
+    }
+
+    #game-container {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    #gameCanvas {
+      /* ===== 【第X轮新增】画布固定铺满窗口，超出窗口的背景直接裁掉 ===== */
+      position: fixed;
+      inset: 0;
+      /* ===== 【第X轮新增】结束 ===== */
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #101419;
+      image-rendering: pixelated;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    #status {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      z-index: 20;
+      max-width: min(620px, calc(100vw - 24px));
+      padding: 9px 12px;
+      border: 1px solid #405265;
+      border-radius: 6px;
+      background: rgba(12, 19, 27, 0.9);
+      color: #d8e7f3;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      pointer-events: none;
+    }
+
+    #status[data-error="true"] {
+      color: #ffd6d6;
+      border-color: #e06b6b;
+    }
+
+    #debug-panel {
+      position: absolute;
+      left: 12px;
+      bottom: 48px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #76efa9;
+      font: 12px/1.7 monospace;
+      white-space: pre-wrap;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      color: #d6e2ee;
+      font-size: 12px;
+      line-height: 1.6;
+      text-shadow: 0 1px 3px #000;
+      pointer-events: none;
+    }
+
+    #ui-modal {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.65);
+    }
+
+    /* 使用 hidden 控制弹窗，不依赖 className 或透明度 */
+    [hidden] {
+      display: none !important;
+    }
+
+    #modal-content {
+      width: min(480px, 100%);
+      max-height: 85vh;
+      overflow: auto;
+      padding: 24px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    #modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    #modal-title {
+      margin: 0;
+      color: #1f2937;
+      font-size: 20px;
+    }
+
+    #modal-close {
+      border: 0;
+      background: transparent;
+      color: #667085;
+      cursor: pointer;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    #modal-body {
+      color: #4b5563;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    /* ===== 【第X轮新增】右上角背景与视角调整面板 ===== */
+    #uiPanel {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      width: min(320px, calc(100vw - 28px));
+      background: rgba(16, 22, 26, 0.88);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #e0e6ed;
+      font-size: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #uiPanel .ui-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: #2ecc71;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
+    }
+
+    #uiPanel .ui-shortcut {
+      font-size: 10px;
+      color: #94a3b8;
+      font-weight: normal;
+      white-space: nowrap;
+    }
+
+    #uiPanel .ui-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #uiPanel .ui-label {
+      color: #a0aec0;
+      white-space: nowrap;
+    }
+
+    #uiPanel .ui-input-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      min-width: 0;
+    }
+
+    #uiPanel input[type="range"] {
+      flex: 1;
+      min-width: 0;
+      accent-color: #2ecc71;
+      cursor: pointer;
+      height: 4px;
+    }
+
+    #uiPanel input[type="number"] {
+      width: 64px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #2ecc71;
+      padding: 3px 6px;
+      font-family: monospace;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    #uiPanel input[type="number"]:focus {
+      outline: none;
+      border-color: #2ecc71;
+    }
+
+    #uiPanel .ui-btn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    #uiPanel .ui-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      color: #d1d5db;
+      padding: 5px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    #uiPanel .ui-btn:hover {
+      background: rgba(46, 204, 113, 0.25);
+      border-color: #2ecc71;
+      color: #ffffff;
+    }
+
+    #uiPanel .ui-info-list {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    #uiPanel .ui-info-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #uiPanel .ui-info-item > span:last-child {
+      text-align: right;
+    }
+
+    #uiPanel .ui-copy-box {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px dashed rgba(46, 204, 113, 0.4);
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #a3e635;
+      word-break: break-all;
+      user-select: text;
+      -webkit-user-select: text;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    #uiPanel .ui-copy-btn {
+      background: #2ecc71;
+      color: #000;
+      border: none;
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #uiPanel .ui-copy-btn:hover {
+      background: #27ae60;
+    }
+    /* ===== 【第X轮新增】结束 ===== */
+
+    /* ===== 【第3轮新增】内置最简交互样式；ui.css 缺失时仍可悬停、打开弹窗和跳转 ===== */
+    #interaction-hover {
+      position: fixed;
+      z-index: 50;
+      max-width: min(280px, calc(100vw - 16px));
+      padding: 6px 10px;
+      border: 1px solid #9db5c9;
+      border-radius: 6px;
+      background: #182430;
+      color: #fff;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+      pointer-events: none;
+    }
+
+    #gameCanvas.interaction-hovering {
+      cursor: none !important;
+    }
+
+    #interaction-cursor {
+      position: fixed;
+      z-index: 51;
+      width: 23px;
+      height: 18px;
+      border: 2px solid #263544;
+      border-radius: 6px;
+      background: #fff;
+      color: #263544;
+      pointer-events: none;
+    }
+
+    #interaction-cursor::before {
+      content: "";
+      position: absolute;
+      left: 3px;
+      bottom: -5px;
+      width: 6px;
+      height: 6px;
+      border-left: 2px solid #263544;
+      border-bottom: 2px solid #263544;
+      background: #fff;
+      transform: skewY(-30deg);
+    }
+
+    #interaction-cursor::after {
+      content: "···";
+      position: absolute;
+      inset: -6px 0 0;
+      text-align: center;
+      font: bold 18px/18px sans-serif;
+    }
+
+    #ui-modal {
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+    }
+
+    #modal-content {
+      animation: interaction-modal-in 0.2s ease-out both;
+    }
+
+    #modal-body .interaction-text {
+      margin: 0 0 16px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    #modal-body .interaction-image {
+      display: block;
+      max-width: 100%;
+      max-height: 40vh;
+      margin: 0 auto 16px;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    #modal-body .interaction-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #modal-body .interaction-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid #9aa7b5;
+      border-radius: 6px;
+      background: #eef2f6;
+      color: #253446;
+      font: inherit;
+      text-align: left;
+      overflow-wrap: anywhere;
+      cursor: pointer;
+    }
+
+    #modal-body .interaction-option:disabled {
+      background: #e5e7eb;
+      color: #828892;
+      cursor: not-allowed;
+    }
+
+    #modal-body .interaction-option-note {
+      flex-shrink: 0;
+      font-size: 12px;
+    }
+
+    #modal-body .interaction-feedback {
+      margin: 14px 0 0;
+      color: #a53d32;
+      font-size: 13px;
+    }
+
+    #interaction-transition {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    #interaction-transition.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @keyframes interaction-modal-in {
+      from {
+        opacity: 0;
+        transform: scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    /* ===== 【第3轮新增】结束 ===== */
+
+    /* ===== 【第4轮新增】现有右上角面板的特效折叠区；独立定位，不挤动原有控件 ===== */
+    #fx-controls {
+      position: absolute;
+      top: 0;
+      right: calc(100% + 12px);
+      width: 270px;
+      max-height: calc(100vh - 28px);
+      overflow: auto;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      background: rgba(16, 22, 26, 0.94);
+      color: #e0e6ed;
+      font-size: 12px;
+      line-height: 1.6;
+      pointer-events: auto;
+    }
+
+    #fx-controls summary {
+      color: #f4d49c;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    #fx-controls .fx-help {
+      margin: 8px 0;
+      color: #aab8c6;
+      font-size: 11px;
+    }
+
+    #fx-controls fieldset {
+      min-width: 0;
+      margin: 10px 0 0;
+      padding: 6px 8px 9px;
+      border: 1px solid #40505b;
+      border-radius: 4px;
+    }
+
+    #fx-controls legend {
+      color: #f4d49c;
+      font-size: 11px;
+    }
+
+    #fx-controls label {
+      display: block;
+      font-size: 11px;
+    }
+
+    #fx-controls .fx-value-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+
+    #fx-controls output {
+      min-width: 46px;
+      color: #a3e635;
+      text-align: right;
+      font-family: monospace;
+      user-select: text;
+    }
+
+    #fx-controls input[type="checkbox"] {
+      accent-color: #2ecc71;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 650px) {
+      #fx-controls {
+        top: calc(100% + 10px);
+        right: 0;
+        width: 100%;
+        max-height: 30vh;
+      }
+    }
+    /* ===== 【第4轮新增】结束 ===== */
+  </style>
+  <!-- ===== 【第3轮新增】外部交互样式放在内置样式之后；缺失时自动保留内置样式 ===== -->
+  <link rel="stylesheet" href="ui.css" />
+  <!-- ===== 【第3轮新增】结束 ===== -->
+</head>
+
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 标准 HTML，不使用 JSX 注释或 className -->
+
+    <!-- ===== 【第3轮新增】悬浮名称、纯 CSS 气泡指针；不改变原有面板结构 ===== -->
+    <div id="interaction-hover" role="tooltip" hidden="true"></div>
+    <div id="interaction-cursor" aria-hidden="true" hidden="true"></div>
+    <!-- ===== 【第3轮新增】结束 ===== -->
+
+    <!-- ===== 【第5轮新增】歌单黑胶唱片遮罩：点歌单出现，点唱片去音乐网站，点空白关闭 ===== -->
+    <div id="music-overlay" hidden="true">
+      <div id="music-stage">
+        <img id="music-vinyl" src="UI/LIUSHENGJI.png" alt="黑胶唱片" draggable="false" />
+        <div id="music-notes" aria-hidden="true"></div>
+      </div>
+    </div>
+    <!-- ===== 【第5轮新增】结束 ===== -->
+
+    <!-- ===== 【第6轮新增】开场黑屏遮罩：点开页面黑屏、两声敲门后从中间向两边渐隐 ===== -->
+    <div id="intro-overlay" aria-hidden="true">
+      <div class="intro-half intro-left"></div>
+      <div class="intro-half intro-right"></div>
+    </div>
+    <!-- ===== 【第6轮新增】结束 ===== -->
+  </div>
+
+  <!-- ===== 【第3轮新增】本地普通脚本加载交互内容；文件缺失时由内联逻辑提供默认内容 ===== -->
+  <script src="interactions.js"></script>
+  <!-- ===== 【第3轮新增】结束 ===== -->
+  <script>
+  (() => {
+    "use strict";
+
+    // =========================================================
+    // 1. 配置
+    // =========================================================
+
+    const CONFIG = {
+      BACKGROUND_SRC: "background.png",
+      CHARACTER_SRC: "character.png",
+      MAP_SRC: "map-data.js",
+
+      // ===== 【第X轮修改】原来是 BG_HEIGHT_RATIO: 0.60，按窗口高度自动适配；现在只在启动时确定固定倍数 =====
+      // null：图片尺寸确定后，按启动窗口计算一次铺满倍数，四舍五入到两位。
+      // 也可直接填固定数字，例如 0.85；手动配置建议范围 0.20～3.00。
+      // 已保存的浏览器设置优先；“恢复默认”使用本次启动确定的这个默认值。
+      // ===== 【第X轮修改】本次原来为 null；现固定默认倍数为0.72，不再根据窗口计算默认值；上面的旧注释仅保留记录 =====
+      BG_SCALE: 0.72,
+      // ===== 【第X轮修改】结束 =====
+      // ===== 【第X轮修改】结束 =====
+
+      // ===== 【第X轮新增】背景调整、镜头跟随与保存参数 =====
+      // 背景外露区域的纯色底色，可填写任意有效 CSS 颜色，建议深色。
+      BG_COLOR: "#000000",
+
+      // 滑动条、数字框及背景大小快捷键的调整范围，建议保持 0.20～3.00。
+      BG_SCALE_MIN: 0.20,
+      BG_SCALE_MAX: 3.00,
+
+      // 背景缩放控件步长，建议 0.01；背景倍数显示和保存保留两位小数。
+      BG_SCALE_STEP: 0.01,
+
+      // [ 和 ] 每次调整的背景缩放倍数，建议 0.01～0.10。
+      BG_SCALE_KEY_STEP: 0.05,
+
+      // 背景缩放倍数的本地存储名称；建议固定不变，避免丢失已保存设置。
+      // ===== 【第X轮修改】本次原来为 "rpg_map_bg_scale"；更换存储键以避免旧比例覆盖新默认值，之后继续保存面板调整 =====
+      STORAGE_KEY_BG_SCALE: "rpg_map_bg_scale_defaults_072_02408",
+      // ===== 【第X轮修改】结束 =====
+
+      // 镜头每个轴的最大偏移，单位为背景原始像素；建议 0～60。
+      // 最终屏幕偏移 = 此数值 × 背景缩放倍数，再取整。
+      // ===== 【第X轮修改】本次原来为35；按要求增加到45个背景原始像素 =====
+      MAX_CAMERA_OFFSET: 45,
+      // ===== 【第X轮修改】结束 =====
+
+      // 60帧参考速度下的 lerp 系数，建议 0.03～0.15，越小越柔和。
+      CAMERA_LERP: 0.08,
+
+      // 缓动参考帧率，建议保持 60，用于减少不同刷新率造成的缓动差异。
+      CAMERA_REFERENCE_FPS: 60,
+
+      // 固定单帧尺寸，单位为精灵图像素；当前8行×4列图集保持16×32。
+      SPRITE_FRAME_WIDTH: 16,
+      SPRITE_FRAME_HEIGHT: 32,
+
+      // 复制成功或失败提示的显示时长，单位毫秒，建议 1000～3000。
+      COPY_FEEDBACK_DURATION: 1500,
+      // ===== 【第X轮新增】结束 =====
+
+      // 只有背景加载失败时才使用下面的尺寸
+      FALLBACK_BG_WIDTH: 1920,
+      FALLBACK_BG_HEIGHT: 1080,
+
+      // ===== 【第X轮修改】本次原来为0.2808；现固定默认角色高度比例为0.2408 =====
+      CHAR_HEIGHT_RATIO: 0.2408,
+      // ===== 【第X轮修改】结束 =====
+
+      // ===== 【第X轮新增】本次角色速度和鼠标跟随双阈值参数 =====
+      // 将原移动算法计算出的速度乘以此值；建议0.30～1.00，0.70表示原速度的70%。
+      // 同时作用于鼠标跟随和点击交互时的行走，不改变动画方向与图集规则。
+      MOVE_SPEED_MULTIPLIER: 0.21,
+
+      // 静止时，距鼠标跟随点超过此距离才起步；单位为背景原始像素，建议15～40。
+      FOLLOW_START_DISTANCE: 25,
+
+      // 行走时，进入此距离即停止；单位为背景原始像素，建议4～12，必须小于起步距离。
+      // 只用于鼠标跟随，不影响点击交互时精确走到stand。
+      FOLLOW_STOP_DISTANCE: 8,
+      // ===== 【第X轮新增】结束 =====
+
+      MIN_SPEED_HEIGHT_RATIO: 1.5,
+      MAX_SPEED_HEIGHT_RATIO: 6.0,
+      CATCHUP_FACTOR: 6,
+
+      ANIM_MIN_FPS: 8,
+      ANIM_MAX_FPS: 16,
+
+      PERSPECTIVE_MIN_SCALE: 0.85,
+      PERSPECTIVE_MAX_SCALE: 1.10,
+
+      // 外部图片默认：4列动画 × 4行方向
+      // 4行顺序：下、左、右、上
+      //
+      // 如果使用8方向图集，改为8。
+      // 8行顺序：下、左下、左、左上、上、右上、右、右下
+      // ===== 【第X轮修改】原来 SPRITE_ROWS 为4；本轮固定8方向，上面的原注释保留但不再使用4行规则 =====
+      SPRITE_ROWS: 8,
+      // ===== 【第X轮修改】结束 =====
+      SPRITE_COLUMNS: 4,
+
+      // 单帧尺寸由整张图片宽高和行列数计算。
+      // 已知的64×256原始降级图会自动识别为8行。
+      // ===== 【第X轮新增】上述原注释保留；本轮改为严格使用64×256图集及16×32单帧，不再自动推算 =====
+      // ===== 【第X轮新增】结束 =====
+
+      // ===== 【第X轮修改】本次原来为 "rpg_map_char_ratio"；更换存储键以避免旧角色比例覆盖新默认值 =====
+      STORAGE_KEY: "rpg_map_char_ratio_defaults_072_02408",
+      // ===== 【第X轮修改】结束 =====
+
+      RESOURCE_TIMEOUT: 5000,
+
+      // ===== 【第4轮新增】视觉特效配置；所有 ENABLED 均为 true 开启、false 关闭 =====
+      FX: {
+        // 总开关；关闭后不执行任何特效绘制，恢复原来的场景渲染。
+        ENABLED: true,
+
+        // 方形粒子的屏幕像素网格；位置和尺寸均对齐此网格，建议 2～4。
+        PIXEL_GRID: 2,
+
+        // 包含鼠标拖尾、点击、环境光点和脚下尘土在内的总数量上限。
+        MAX_PARTICLES: 180,
+
+        // 泛光：STRENGTH 为亮度 0～0.6；RADIUS 为扩散倍率 0.5～4。
+        // 使用缩小的场景副本、multiply 压暗暗部、screen 叠加，不读取图片像素。
+        BLOOM: { ENABLED: true, STRENGTH: 0.6, RADIUS: 4 },
+
+        // 鼠标拖尾：STRENGTH 为数量及亮度倍率 0～2；SIZE 为方块基础屏幕尺寸。
+        TRAIL: { ENABLED: true, STRENGTH: 0.75, SIZE: 4 },
+
+        // 点击爆发：STRENGTH 为数量及亮度倍率 0～2；SIZE 为方块基础屏幕尺寸。
+        // COUNT 为一圈基础数量；SPEED 为屏幕像素/秒。
+        CLICK: { ENABLED: true, STRENGTH: 1, SIZE: 4, COUNT: 24, SPEED: 65 },
+
+        // 环境光点：STRENGTH 为亮度 0～1；COUNT 为基础数量；SIZE 为屏幕像素。
+        // SPEED 为漂浮速度倍率 0～2；PARALLAX 为近景额外镜头视差倍率 0～2。
+        AMBIENT: { ENABLED: true, STRENGTH: 1, COUNT: 80, SIZE: 8, SPEED: 1.5, PARALLAX: 0.8 },
+
+        // 暖色：STRENGTH 为透明度 0～0.2；默认仅轻微染暖。
+        WARMTH: { ENABLED: true, STRENGTH: 0.04, COLOR: "#ffb86b" },
+
+        // 暗角：STRENGTH 为边缘暗度 0～0.8；SIZE 为中央清晰范围比例 0.1～0.8。
+        // SIZE 越大，中央不受暗角影响的范围越大。
+        VIGNETTE: { ENABLED: true, STRENGTH: 0.8, SIZE: 0.4 },
+
+        // 鼠标灯光：STRENGTH 为亮度 0～0.8；RADIUS 为屏幕像素半径 40～400。
+        LIGHT: { ENABLED: true, STRENGTH: 0.24, RADIUS: 150 },
+
+        // 脚下尘土：STRENGTH 为数量及透明度倍率 0～2；SIZE 为屏幕像素。
+        // RATE 为行走时每秒基础发射数量；停止或弹窗打开后不再产生新尘土。
+        DUST: { ENABLED: true, STRENGTH: 1.4, SIZE: 10, RATE: 9 },
+
+        // 自动降质：每秒统计实际帧率，连续低于 FPS 达 SECONDS 秒后降低一级。
+        // 只降低粒子数量、泛光采样精度与层数，不改变背景、人物、碰撞或移动。
+        AUTO_QUALITY: { ENABLED: true, FPS: 40, SECONDS: 3, MIN_SCALE: 0.35 },
+
+        // 跟随系统“减少动态效果”；FACTOR 为保留的粒子比例，建议 0.1～0.4。
+        REDUCED_MOTION: { ENABLED: true, FACTOR: 0.25 }
+      },
+      // ===== 【第4轮新增】结束 =====
+
+      // 碰撞检查时将单帧位移细分，减少大步长跨过凹边界的问题
+      COLLISION_STEP: 2
+    };
+
+    // =========================================================
+    // 【区域跳转网址配置】以后想换网址，直接改下面的 ZONE_LINKS 即可
+    // =========================================================
+    // 每个区域一行，等号右边填网址，有两种写法：
+    //   · 相对路径：相对于本 index.html 所在文件夹，例如 "pages/pc.html"
+    //   · 完整网址：例如 "https://example.com"
+    // PC / art_1 / boot_1：人物走到对应区域后跳转到的网页。
+    // wyy_1：音乐网址，点击黑胶唱片后在【新标签页】打开。
+    // 下面目前都是占位网址，请替换成你自己的地址。
+    const ZONE_LINKS = {
+      PC: "../../pages/PC/index.html",                      // 电脑桌 → 跳转网址
+      art_1: "../../pages/portfolio/4/QBwID-I/index.html",  // 作品集 → 跳转网址
+      boot_1: "../../pages/备忘/1/index.html",              // 备忘板 → 跳转网址
+      wyy_1: "https://www.youtube.com/watch?v=3gkSzjp-aoY"  // 歌单音乐网址（新标签打开）
+    };
+    // =========================================================
+
+    // ===== 【第6轮新增】开场：黑色遮罩从中间向两边渐隐 =====
+    function runIntro() {
+      const overlay = introOverlay;
+      if (!overlay) return;
+
+      overlay.classList.remove("is-hidden", "is-revealing");
+
+      // 黑幕从中间向左右两侧滑开并淡出。
+      setTimeout(() => {
+        overlay.classList.add("is-revealing");
+      }, 850);
+
+      // 动画结束后彻底移除遮罩。
+      setTimeout(() => {
+        overlay.classList.add("is-hidden");
+      }, 1900);
+    }
+    // ===== 【第6轮新增】结束 =====
+
+    const DETAILS = {
+      PC: "这里是电脑桌，用于日常编码、软件开发以及技术研究。",
+      art_1: "这里是个人设计与开发作品集展示。",
+      wyy_1: "这里是音乐播放歌单。"
+    };
+
+    // =========================================================
+    // 2. DOM 和启动诊断
+    // =========================================================
+
+    const canvas = document.getElementById("gameCanvas");
+
+    // ===== 【第3轮新增】交互专用元素及状态；歌单遮罩元素也在此取得 =====
+    const interactionHover = document.getElementById("interaction-hover");
+    const interactionCursor = document.getElementById("interaction-cursor");
+    const musicOverlay = document.getElementById("music-overlay");
+    const musicVinyl = document.getElementById("music-vinyl");
+    const musicNotes = document.getElementById("music-notes");
+    const introOverlay = document.getElementById("intro-overlay");
+    const interactionState = {
+      pointerInside: false,
+      jumping: false
+    };
+    // ===== 【第3轮新增】结束 =====
+
+    document.documentElement.style.backgroundColor = CONFIG.BG_COLOR;
+    document.body.style.backgroundColor = CONFIG.BG_COLOR;
+    canvas.style.backgroundColor = CONFIG.BG_COLOR;
+
+    function reportError(error) {
+      console.error(error);
+    }
+
+    window.addEventListener("error", event => {
+      // 普通资源加载失败由加载器单独处理
+      if (event.error) reportError(event.error);
+    });
+
+    window.addEventListener("unhandledrejection", event => {
+      reportError(event.reason);
+    });
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      reportError(new Error("当前浏览器无法创建 Canvas 2D 上下文。"));
+      return;
+    }
+
+    const clamp = (value, min, max) =>
+      Math.max(min, Math.min(max, value));
+
+    const finite = value => Number.isFinite(value);
+
+    // =========================================================
+    // 3. 资源加载：失败或超时都有回退
+    // =========================================================
+
+    function loadImage(src) {
+      return new Promise(resolve => {
+        const image = new Image();
+        let settled = false;
+        let timer;
+
+        function finish(result) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          image.onload = null;
+          image.onerror = null;
+          resolve(result);
+        }
+
+        image.onload = () => {
+          finish(
+            image.naturalWidth > 0 && image.naturalHeight > 0
+              ? image
+              : null
+          );
+        };
+
+        image.onerror = () => finish(null);
+
+        timer = setTimeout(
+          () => finish(null),
+          CONFIG.RESOURCE_TIMEOUT
+        );
+
+        image.src = src;
+      });
+    }
+
+    function readMapData() {
+      if (window.MAP_DATA) return window.MAP_DATA;
+
+      // 兼容普通脚本中使用 const MAP_DATA = ... 的写法。
+      // 推荐 map-data.js 明确使用 window.MAP_DATA = ...
+      try {
+        if (typeof MAP_DATA !== "undefined") return MAP_DATA;
+      } catch (_) {}
+
+      return null;
+    }
+
+    function loadMapData() {
+      const existing = readMapData();
+      if (existing) return Promise.resolve(existing);
+
+      return new Promise(resolve => {
+        const script = document.createElement("script");
+        let settled = false;
+        let timer;
+
+        function finish(data) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          script.onload = null;
+          script.onerror = null;
+          resolve(data);
+        }
+
+        script.onload = () => finish(readMapData());
+        script.onerror = () => finish(null);
+
+        timer = setTimeout(
+          () => finish(null),
+          CONFIG.RESOURCE_TIMEOUT
+        );
+
+        script.src = CONFIG.MAP_SRC;
+        document.head.appendChild(script);
+      });
+    }
+
+    // =========================================================
+    // 4. 地图数据校验和几何运算
+    // =========================================================
+
+    function normalizePoint(point) {
+      if (!point) return null;
+
+      const x = Number(Array.isArray(point) ? point[0] : point.x);
+      const y = Number(Array.isArray(point) ? point[1] : point.y);
+
+      return finite(x) && finite(y) ? { x, y } : null;
+    }
+
+    function normalizePolygon(points) {
+      if (!Array.isArray(points)) return null;
+
+      const result = [];
+
+      for (const item of points) {
+        const point = normalizePoint(item);
+        if (!point) return null;
+        result.push([point.x, point.y]);
+      }
+
+      if (result.length < 3) return null;
+
+      let twiceArea = 0;
+
+      for (let i = 0; i < result.length; i++) {
+        const a = result[i];
+        const b = result[(i + 1) % result.length];
+        twiceArea += a[0] * b[1] - b[0] * a[1];
+      }
+
+      return Math.abs(twiceArea) > 0.000001 ? result : null;
+    }
+
+    function normalizeMap(data) {
+      if (!data || !data.movableArea) return null;
+
+      const points = normalizePolygon(data.movableArea.points);
+      if (!points) return null;
+
+      const zones = [];
+
+      for (const zone of (
+        Array.isArray(data.interactiveZones)
+          ? data.interactiveZones
+          : []
+      )) {
+        if (!zone) continue;
+
+        const zonePoints = normalizePolygon(zone.points);
+        if (!zonePoints) continue;
+
+        // ===== 【第3轮新增】从原始区域补读 ui、tip；原地图转换器未保留这两个字段，不修改 map-data.js =====
+        const rawZones = Array.isArray(data.rawZones)
+          ? data.rawZones
+          : (Array.isArray(window.GAME_ZONES) ? window.GAME_ZONES : []);
+        const rawZone = rawZones.find(item =>
+          item && item.id === zone.id
+        ) || zone;
+        // ===== 【第3轮新增】结束 =====
+
+        zones.push({
+          id: zone.id || "",
+          // ===== 【第3轮修改】原来为 zone.name || zone.id || "交互区域"；改为名称缺失时优先使用 tip =====
+          name: zone.name || rawZone.name || zone.tip || rawZone.tip || "交互区域",
+          // ===== 【第3轮修改】结束 =====
+          // ===== 【第3轮新增】保留点击触发类型、提示和主题；只允许明确标为 click 的区域交互 =====
+          trigger: zone.trigger || rawZone.trigger || "",
+          tip: zone.tip || rawZone.tip || "",
+          ui: zone.ui || rawZone.ui || "",
+          // ===== 【第3轮新增】结束 =====
+          points: zonePoints,
+          stand: normalizePoint(zone.stand)
+        });
+      }
+
+      return {
+        movableArea: {
+          id: data.movableArea.id || "movable",
+          name: data.movableArea.name || "可活动区域",
+          points,
+          stand: normalizePoint(data.movableArea.stand)
+        },
+        interactiveZones: zones
+      };
+    }
+
+    // 边界上的点也视为合法，避免站立点正好位于边缘时无法到达
+    function pointOnSegment(x, y, a, b) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const length = Math.hypot(dx, dy);
+      const epsilon = 0.00001;
+
+      if (length < epsilon) {
+        return Math.hypot(x - a[0], y - a[1]) <= epsilon;
+      }
+
+      const cross = (x - a[0]) * dy - (y - a[1]) * dx;
+      if (Math.abs(cross) > epsilon * length) return false;
+
+      const dot = (x - a[0]) * dx + (y - a[1]) * dy;
+
+      return dot >= -epsilon &&
+        dot <= length * length + epsilon;
+    }
+
+    function isPointInPolygon(x, y, points) {
+      if (!points || points.length < 3) return false;
+
+      let inside = false;
+
+      for (
+        let i = 0, j = points.length - 1;
+        i < points.length;
+        j = i++
+      ) {
+        const a = points[j];
+        const b = points[i];
+
+        if (pointOnSegment(x, y, a, b)) return true;
+
+        if (
+          (a[1] > y) !== (b[1] > y) &&
+          x < (b[0] - a[0]) * (y - a[1]) /
+            (b[1] - a[1]) + a[0]
+        ) {
+          inside = !inside;
+        }
+      }
+
+      return inside;
+    }
+
+    function getBounds(points) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      for (const [x, y] of points) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+
+      return { minX, minY, maxX, maxY };
+    }
+
+    // 找一个多边形内部出生点，避免使用可能在凹多边形外的顶点平均值
+    function findInteriorPoint(points) {
+      const levels = [...new Set(points.map(p => p[1]))]
+        .sort((a, b) => a - b);
+
+      for (let k = 0; k < levels.length - 1; k++) {
+        const y = (levels[k] + levels[k + 1]) / 2;
+        const intersections = [];
+
+        for (let i = 0; i < points.length; i++) {
+          const a = points[i];
+          const b = points[(i + 1) % points.length];
+
+          if ((a[1] > y) !== (b[1] > y)) {
+            intersections.push(
+              a[0] + (y - a[1]) *
+              (b[0] - a[0]) / (b[1] - a[1])
+            );
+          }
+        }
+
+        intersections.sort((a, b) => a - b);
+
+        for (let i = 0; i + 1 < intersections.length; i += 2) {
+          const x = (intersections[i] + intersections[i + 1]) / 2;
+
+          if (isPointInPolygon(x, y, points)) {
+            return { x, y };
+          }
+        }
+      }
+
+      return { x: points[0][0], y: points[0][1] };
+    }
+
+    // 地图未提供时的明确演示数据，不覆盖有效的真实地图
+    function createDemoMap(width, height) {
+      function rectangle(x1, y1, x2, y2) {
+        return [
+          [x1 * width, y1 * height],
+          [x2 * width, y1 * height],
+          [x2 * width, y2 * height],
+          [x1 * width, y2 * height]
+        ];
+      }
+
+      return {
+        movableArea: {
+          id: "demo_floor",
+          name: "演示可行走区域",
+          points: rectangle(0.08, 0.35, 0.92, 0.95),
+          stand: { x: width * 0.5, y: height * 0.76 }
+        },
+        interactiveZones: [
+          {
+            id: "PC",
+            name: "电脑桌",
+            points: rectangle(0.15, 0.16, 0.35, 0.40),
+            stand: { x: width * 0.25, y: height * 0.51 }
+          },
+          {
+            id: "art_1",
+            name: "作品集",
+            points: rectangle(0.65, 0.16, 0.85, 0.40),
+            stand: { x: width * 0.75, y: height * 0.51 }
+          }
+        ]
+      };
+    }
+
+    // =========================================================
+    // 5. 像素人物：生成、移动、方向动画、透视和阴影
+    // =========================================================
+
+    function createFallbackCharacter() {
+      const image = document.createElement("canvas");
+      image.width = 64;
+      image.height = 256;
+
+      const g = image.getContext("2d");
+
+      const colors = [
+        "#e74c3c", "#3498db", "#2ecc71", "#f1c40f",
+        "#9b59b6", "#1abc9c", "#e67e22", "#e84393"
+      ];
+
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 4; col++) {
+          const x = col * 16;
+          const y = row * 32;
+
+          g.fillStyle = colors[row];
+          g.fillRect(x + 2, y + 8, 12, 18);
+
+          g.fillStyle = "#f39c12";
+          g.fillRect(x + 3, y + 2, 10, 8);
+
+          let eyeX = x + 5;
+
+          if (row >= 1 && row <= 3) eyeX = x + 3;
+          if (row >= 5 && row <= 7) eyeX = x + 8;
+
+          g.fillStyle = "#fff";
+          g.fillRect(eyeX, y + 4, 3, 3);
+
+          g.fillStyle = "#000";
+          g.fillRect(eyeX + 1, y + 5, 1, 1);
+
+          const legOffset = col % 2 === 0 ? 0 : 2;
+
+          g.fillStyle = "#2c3e50";
+          g.fillRect(x + 3, y + 26, 4, 5 - legOffset);
+          g.fillRect(x + 9, y + 26, 4, 3 + legOffset);
+        }
+      }
+
+      return image;
+    }
+
+    function getDirectionIndex(dx, dy) {
+      // atan2角度分为8个扇区，再映射到：
+      // 下、左下、左、左上、上、右上、右、右下
+      const sector = (
+        Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8
+      ) % 8;
+
+      return [6, 7, 0, 1, 2, 3, 4, 5][sector];
+    }
+
+    class PixelCharacter {
+      constructor() {
+        // 先生成可绘制角色，不等待外部图片
+        this.image = createFallbackCharacter();
+        this.frameWidth = 16;
+        this.frameHeight = 32;
+        this.frameCount = 4;
+        this.directionOrder = [0, 1, 2, 3, 4, 5, 6, 7];
+        this.usingFallback = true;
+
+        this.x = 0;
+        this.y = 0;
+        this.targetX = 0;
+        this.targetY = 0;
+
+        this.dirIndex = 0;
+        this.animFrame = 0;
+        this.animTimer = 0;
+
+        this.heightRatio = CONFIG.CHAR_HEIGHT_RATIO;
+        this.lastTarget = null;
+        this.smoothedMouseSpeed = 0;
+        this.actualSpeed = 0;
+        this.blocked = false;
+
+        // ===== 【第X轮新增】本次记录鼠标跟随是否已起步，区分起步和停止阈值 =====
+        this.followWalking = false;
+        // ===== 【第X轮新增】结束 =====
+
+        try {
+          const value = Number(localStorage.getItem(CONFIG.STORAGE_KEY));
+
+          if (finite(value) && value >= 0.01 && value <= 0.8) {
+            this.heightRatio = value;
+          }
+        } catch (_) {}
+      }
+
+      // ===== 【第X轮修改】原来自动推算单帧尺寸并兼容4行；现在固定8行×4列、单帧16×32及原8方向顺序 =====
+      useImage(image) {
+        if (!image) return false;
+
+        const rows = CONFIG.SPRITE_ROWS;
+        const columns = CONFIG.SPRITE_COLUMNS;
+
+        if (
+          rows !== 8 ||
+          columns !== 4 ||
+          image.naturalWidth !== columns * CONFIG.SPRITE_FRAME_WIDTH ||
+          image.naturalHeight !== rows * CONFIG.SPRITE_FRAME_HEIGHT
+        ) {
+          return false;
+        }
+
+        this.image = image;
+        this.frameWidth = CONFIG.SPRITE_FRAME_WIDTH;
+        this.frameHeight = CONFIG.SPRITE_FRAME_HEIGHT;
+        this.frameCount = columns;
+        this.directionOrder = [0, 1, 2, 3, 4, 5, 6, 7];
+
+        this.usingFallback = false;
+        return true;
+      }
+      // ===== 【第X轮修改】结束 =====
+
+      setHeightRatio(value) {
+        if (!finite(value)) return;
+
+        this.heightRatio = clamp(value, 0.01, 0.8);
+
+        try {
+          localStorage.setItem(
+            CONFIG.STORAGE_KEY,
+            String(this.heightRatio)
+          );
+        } catch (_) {}
+      }
+
+      resetTracking() {
+        this.lastTarget = null;
+        this.smoothedMouseSpeed = 0;
+        // ===== 【第X轮新增】本次重新跟随时恢复为未起步状态 =====
+        this.followWalking = false;
+        // ===== 【第X轮新增】结束 =====
+      }
+
+      stop() {
+        this.animFrame = 0;
+        this.animTimer = 0;
+        this.actualSpeed = 0;
+        // ===== 【第X轮新增】本次停止后须再次超过起步距离才恢复鼠标跟随行走 =====
+        this.followWalking = false;
+        // ===== 【第X轮新增】结束 =====
+      }
+
+      update(dt, target, worldHeight, canWalk, measureMouseSpeed) {
+        if (!(dt > 0)) return;
+
+        this.blocked = false;
+        this.targetX = target.x;
+        this.targetY = target.y;
+
+        // 原模块中的鼠标速度平滑逻辑
+        if (measureMouseSpeed && this.lastTarget) {
+          const rawSpeed = Math.hypot(
+            target.x - this.lastTarget.x,
+            target.y - this.lastTarget.y
+          ) / dt;
+
+          const smoothing = Math.min(1, dt * 10);
+
+          this.smoothedMouseSpeed +=
+            (rawSpeed - this.smoothedMouseSpeed) * smoothing;
+        } else {
+          this.smoothedMouseSpeed = 0;
+        }
+
+        this.lastTarget = { x: target.x, y: target.y };
+
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const distance = Math.hypot(dx, dy);
+
+        // ===== 【第X轮新增】本次鼠标跟随双阈值；点击交互仍沿用原来的精确到达规则 =====
+        if (measureMouseSpeed) {
+          if (!this.followWalking) {
+            if (distance <= CONFIG.FOLLOW_START_DISTANCE) {
+              this.stop();
+              return;
+            }
+
+            this.followWalking = true;
+          } else if (distance <= CONFIG.FOLLOW_STOP_DISTANCE) {
+            this.stop();
+            return;
+          }
+        } else {
+          this.followWalking = false;
+        }
+        // ===== 【第X轮新增】结束 =====
+
+        if (distance < 0.000001) {
+          this.stop();
+          return;
+        }
+
+        const height = this.heightRatio * worldHeight;
+        const minSpeed = height * CONFIG.MIN_SPEED_HEIGHT_RATIO;
+        const maxSpeed = height * CONFIG.MAX_SPEED_HEIGHT_RATIO;
+
+        // ===== 【第X轮修改】本次原来直接使用 Math.min(...) 的速度；现将原计算结果乘以0.70 =====
+        const speed = CONFIG.MOVE_SPEED_MULTIPLIER * Math.min(
+          maxSpeed,
+          Math.max(
+            minSpeed,
+            this.smoothedMouseSpeed,
+            distance * CONFIG.CATCHUP_FACTOR
+          )
+        );
+        // ===== 【第X轮修改】结束 =====
+
+        // ===== 【第X轮修改】本次原来为 Math.min(distance, speed * dt)；鼠标跟随最多走到停止距离，避免一帧跨过停止圈 =====
+        const movement = Math.min(
+          measureMouseSpeed
+            ? Math.max(0, distance - CONFIG.FOLLOW_STOP_DISTANCE)
+            : distance,
+          speed * dt
+        );
+        // ===== 【第X轮修改】结束 =====
+
+        this.dirIndex = getDirectionIndex(dx, dy);
+
+        // 每帧移动拆成小步；每一步移动后都检查多边形。
+        // 不使用原来的矩形 clamp，避免改变交互站立点。
+        const steps = Math.max(
+          1,
+          Math.ceil(movement / CONFIG.COLLISION_STEP)
+        );
+
+        const stepX = dx / distance * movement / steps;
+        const stepY = dy / distance * movement / steps;
+
+        for (let i = 0; i < steps; i++) {
+          const oldX = this.x;
+          const oldY = this.y;
+
+          this.x += stepX;
+          this.y += stepY;
+
+          if (!canWalk(this.x, this.y)) {
+            this.x = oldX;
+            this.y = oldY;
+            this.blocked = true;
+            this.stop();
+            return;
+          }
+        }
+
+        this.actualSpeed = movement / dt;
+
+        // ===== 【第X轮新增】本次到达停止圈立即结束行走动画，沿用原计算精度容差 =====
+        if (
+          measureMouseSpeed &&
+          distance - movement <= CONFIG.FOLLOW_STOP_DISTANCE + 0.000001
+        ) {
+          this.stop();
+          return;
+        }
+        // ===== 【第X轮新增】结束 =====
+
+        if (movement >= distance - 0.000001) {
+          // 只有真实目标合法才精确落到目标上
+          if (canWalk(target.x, target.y)) {
+            this.x = target.x;
+            this.y = target.y;
+          }
+
+          this.stop();
+          return;
+        }
+
+        const progress = clamp(
+          (speed - minSpeed) / Math.max(1, maxSpeed - minSpeed),
+          0,
+          1
+        );
+
+        const fps = CONFIG.ANIM_MIN_FPS +
+          progress * (CONFIG.ANIM_MAX_FPS - CONFIG.ANIM_MIN_FPS);
+
+        const frameTime = 1 / fps;
+
+        this.animTimer += dt;
+
+        if (this.animTimer >= frameTime) {
+          this.animFrame = (
+            this.animFrame + Math.floor(this.animTimer / frameTime)
+          ) % this.frameCount;
+
+          this.animTimer %= frameTime;
+        }
+      }
+
+      render(context, view, worldHeight, bounds) {
+        const depth = clamp(
+          (this.y - bounds.minY) /
+          Math.max(1, bounds.maxY - bounds.minY),
+          0,
+          1
+        );
+
+        const perspective = CONFIG.PERSPECTIVE_MIN_SCALE +
+          depth * (
+            CONFIG.PERSPECTIVE_MAX_SCALE -
+            CONFIG.PERSPECTIVE_MIN_SCALE
+          );
+
+        const height =
+          this.heightRatio * worldHeight * view.scale * perspective;
+
+        const width = height * this.frameWidth / this.frameHeight;
+
+        const footX = view.x + this.x * view.scale;
+        const footY = view.y + this.y * view.scale;
+
+        context.save();
+        context.imageSmoothingEnabled = false;
+
+        context.fillStyle = "rgba(0, 0, 0, 0.35)";
+        context.beginPath();
+        context.ellipse(
+          footX,
+          footY,
+          width * 0.45,
+          width * 0.18,
+          0,
+          0,
+          Math.PI * 2
+        );
+        context.fill();
+
+        const row = this.directionOrder[this.dirIndex];
+
+        context.drawImage(
+          this.image,
+          this.animFrame * this.frameWidth,
+          row * this.frameHeight,
+          this.frameWidth,
+          this.frameHeight,
+          Math.round(footX - width / 2),
+          Math.round(footY - height),
+          Math.max(1, Math.round(width)),
+          Math.max(1, Math.round(height))
+        );
+
+        context.restore();
+      }
+    }
+
+    // =========================================================
+    // 6. 游戏状态和坐标换算
+    // =========================================================
+
+    const hero = new PixelCharacter();
+
+    const view = {
+      width: 1,
+      height: 1,
+      dpr: 1,
+      scale: 1,
+      x: 0,
+      y: 0
+    };
+
+    const state = {
+      ready: false,
+      map: null,
+      bounds: null,
+
+      background: null,
+      worldWidth: CONFIG.FALLBACK_BG_WIDTH,
+      worldHeight: CONFIG.FALLBACK_BG_HEIGHT,
+
+      demo: false,
+      // ===== 【第X轮修改】原来 debug 为 false；本轮默认关闭调整面板和调试信息 =====
+      debug: false,
+      // ===== 【第X轮修改】结束 =====
+
+      mode: "FOLLOW",
+      followActive: false,
+      pendingZone: null,
+
+      mouseX: 0,
+      mouseY: 0,
+
+      notes: []
+    };
+
+    // ===== 【第X轮新增】镜头状态、固定背景缩放、面板更新及复制 =====
+    const camera = {
+      x: 0,
+      y: 0,
+      mouseX: 0,
+      mouseY: 0,
+      active: false,
+      paused: false
+    };
+
+    function updateViewPosition() {
+      // 镜头内部以背景原始像素保存，转换到屏幕后取整。
+      const cameraScreenX = Math.round(camera.x * view.scale);
+      const cameraScreenY = Math.round(camera.y * view.scale);
+
+      view.x = Math.round(
+        (view.width - state.worldWidth * view.scale) / 2
+      ) + cameraScreenX;
+
+      view.y = Math.round(
+        (view.height - state.worldHeight * view.scale) / 2
+      ) + cameraScreenY;
+    }
+
+    function updateCamera(dt) {
+      if (!camera.paused) {
+        const targetX = camera.active
+          ? clamp(
+              (camera.mouseX - view.width / 2) / (view.width / 2),
+              -1,
+              1
+            ) * CONFIG.MAX_CAMERA_OFFSET
+          : 0;
+
+        const targetY = camera.active
+          ? clamp(
+              (camera.mouseY - view.height / 2) / (view.height / 2),
+              -1,
+              1
+            ) * CONFIG.MAX_CAMERA_OFFSET
+          : 0;
+
+        const amount = 1 - Math.pow(
+          1 - clamp(CONFIG.CAMERA_LERP, 0, 1),
+          dt * CONFIG.CAMERA_REFERENCE_FPS
+        );
+
+        camera.x += (targetX - camera.x) * amount;
+        camera.y += (targetY - camera.y) * amount;
+      }
+
+      updateViewPosition();
+    }
+
+    function returnCameraToCenter() {
+      camera.active = false;
+      camera.paused = false;
+
+      if (state.mode === "FOLLOW") pauseFollowing();
+    }
+
+    function initializeBackgroundScale() {
+      // 等待真实背景尺寸确定后计算一次，后续 resize 不再重算。
+      // ===== 【第X轮修改】本次原来在BG_SCALE为空时按窗口计算并回写默认值；现直接读取固定默认值0.72，不再计算或回写CONFIG =====
+      // 上面的旧注释保留记录；现在仅在背景尺寸确定后应用固定默认值和用户保存值。
+      view.scale = CONFIG.BG_SCALE;
+      // ===== 【第X轮修改】结束 =====
+
+      try {
+        const saved = localStorage.getItem(CONFIG.STORAGE_KEY_BG_SCALE);
+
+        if (saved !== null) {
+          const value = Number(saved);
+
+          if (finite(value) && value > 0) {
+            view.scale = Math.max(
+              CONFIG.BG_SCALE_STEP,
+              Math.round(value * 100) / 100
+            );
+          }
+        }
+      } catch (_) {}
+
+      updateViewPosition();
+    }
+
+    // ===== 【第4轮新增】特效独立状态、输入、更新与绘制 =====
+    const fx = {
+      particles: [],
+      ambient: [],
+      quality: 1,
+      sampleTime: 0,
+      sampleFrames: 0,
+      lowTime: 0,
+      skipSample: true,
+      time: 0,
+      trailCredit: 0,
+      dustCredit: 0,
+      lightAlpha: 0,
+      pointer: { active: false, x: 0, y: 0, lastX: 0, lastY: 0 },
+      bloom: [document.createElement("canvas"), document.createElement("canvas")],
+      vignette: null,
+      vignetteKey: "",
+      motionQuery: window.matchMedia
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null
+    };
+
+    function fxEnabled(key) {
+      return CONFIG.FX.ENABLED &&
+        CONFIG.FX[key].ENABLED &&
+        CONFIG.FX[key].STRENGTH > 0;
+    }
+
+    function fxMotionFactor() {
+      return CONFIG.FX.REDUCED_MOTION.ENABLED &&
+        fx.motionQuery && fx.motionQuery.matches
+        ? clamp(CONFIG.FX.REDUCED_MOTION.FACTOR, 0, 1)
+        : 1;
+    }
+
+    function fxLimit() {
+      return Math.max(0, Math.floor(
+        CONFIG.FX.MAX_PARTICLES * fx.quality * fxMotionFactor()
+      ));
+    }
+
+    function fxReadPointer(event) {
+      if (
+        !state.ready || state.mode === "MODAL" ||
+        interactionState.jumping || event.pointerType === "touch"
+      ) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * view.width / rect.width;
+      const y = (event.clientY - rect.top) * view.height / rect.height;
+
+      if (!fx.pointer.active) {
+        fx.pointer.lastX = x;
+        fx.pointer.lastY = y;
+      }
+
+      fx.pointer.x = x;
+      fx.pointer.y = y;
+      fx.pointer.active = true;
+    }
+
+    function fxLeavePointer() {
+      fx.pointer.active = false;
+      fx.trailCredit = 0;
+    }
+
+    function fxAddParticle(kind, x, y, vx, vy, life) {
+      if (fx.particles.length + fx.ambient.length >= fxLimit()) return;
+
+      fx.particles.push({
+        kind, x, y, vx, vy, life, maxLife: life,
+        size: 0.65 + Math.random() * 0.55,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+
+    canvas.addEventListener("pointerenter", fxReadPointer);
+    canvas.addEventListener("pointermove", fxReadPointer);
+    canvas.addEventListener("pointerleave", fxLeavePointer);
+    window.addEventListener("blur", fxLeavePointer);
+
+    canvas.addEventListener("click", event => {
+      if (
+        !state.ready || state.mode === "MODAL" ||
+        interactionState.jumping || !fxEnabled("CLICK")
+      ) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * view.width / rect.width;
+      const y = (event.clientY - rect.top) * view.height / rect.height;
+      const count = Math.min(
+        Math.max(0, fxLimit() - fx.particles.length - fx.ambient.length),
+        Math.floor(CONFIG.FX.CLICK.COUNT * CONFIG.FX.CLICK.STRENGTH *
+          fx.quality * fxMotionFactor())
+      );
+
+      for (let i = 0; i < count; i++) {
+        const angle = i / count * Math.PI * 2;
+        const speed = CONFIG.FX.CLICK.SPEED * (0.8 + Math.random() * 0.4);
+        fxAddParticle(
+          "CLICK", x + Math.cos(angle) * 4, y + Math.sin(angle) * 4,
+          Math.cos(angle) * speed, Math.sin(angle) * speed,
+          0.65 + Math.random() * 0.35
+        );
+      }
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      // 不把切换标签页造成的长间隔误认为场景性能下降。
+      fx.sampleTime = 0;
+      fx.sampleFrames = 0;
+      fx.lowTime = 0;
+      fx.skipSample = true;
+      fxLeavePointer();
+    });
+
+    function updateEffects(dt, frameSeconds) {
+      const c = CONFIG.FX;
+
+      if (!c.AUTO_QUALITY.ENABLED) {
+        fx.quality = 1;
+        fx.lowTime = 0;
+      }
+
+      if (
+        c.ENABLED && c.AUTO_QUALITY.ENABLED &&
+        !document.hidden && !fx.skipSample && frameSeconds > 0
+      ) {
+        // 使用未截断的真实帧间隔；不使用人物移动的 0.05 秒上限。
+        fx.sampleTime += frameSeconds;
+        fx.sampleFrames++;
+
+        if (fx.sampleTime >= 1) {
+          const fps = fx.sampleFrames / fx.sampleTime;
+          fx.lowTime = fps < c.AUTO_QUALITY.FPS
+            ? fx.lowTime + fx.sampleTime
+            : 0;
+
+          if (fx.lowTime >= c.AUTO_QUALITY.SECONDS) {
+            fx.quality = Math.max(
+              clamp(c.AUTO_QUALITY.MIN_SCALE, 0.1, 1),
+              fx.quality - 0.325
+            );
+            fx.lowTime = 0;
+          }
+
+          fx.sampleTime = 0;
+          fx.sampleFrames = 0;
+        }
+      } else {
+        fx.sampleTime = 0;
+        fx.sampleFrames = 0;
+        fx.lowTime = 0;
+      }
+
+      fx.skipSample = false;
+
+      if (!c.ENABLED) {
+        fx.particles.length = 0;
+        fx.ambient.length = 0;
+        fx.trailCredit = 0;
+        fx.dustCredit = 0;
+        fx.lightAlpha = 0;
+        fx.pointer.lastX = fx.pointer.x;
+        fx.pointer.lastY = fx.pointer.y;
+        return;
+      }
+
+      const motion = fxMotionFactor();
+      const amount = fx.quality * motion;
+      const limit = fxLimit();
+      fx.time += dt * (motion < 1 ? 0.4 : 1);
+
+      const ambientCount = fxEnabled("AMBIENT")
+        ? Math.max(0, Math.min(
+            Math.floor(limit * 0.4),
+            Math.floor(c.AMBIENT.COUNT * amount)
+          ))
+        : 0;
+
+      if (fx.ambient.length > ambientCount) fx.ambient.length = ambientCount;
+
+      while (fx.ambient.length < ambientCount) {
+        fx.ambient.push({
+          x: Math.random(),
+          y: Math.random(),
+          depth: Math.random(),
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      const remaining = Math.max(0, limit - fx.ambient.length);
+      if (fx.particles.length > remaining) fx.particles.length = remaining;
+
+      for (let i = fx.particles.length - 1; i >= 0; i--) {
+        const p = fx.particles[i];
+        p.life -= dt;
+
+        if (p.life <= 0 || !fxEnabled(p.kind)) {
+          fx.particles.splice(i, 1);
+          continue;
+        }
+
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vx *= Math.exp(-1.2 * dt);
+        p.vy -= (p.kind === "DUST" ? 3 : 5) * dt;
+      }
+
+      for (const p of fx.ambient) {
+        const speed = c.AMBIENT.SPEED * (motion < 1 ? 0.4 : 1);
+        p.x += Math.sin(fx.time * 0.35 + p.phase) *
+          (2 + p.depth * 5) * speed * dt / view.width;
+        p.y -= (2 + p.depth * 5) * speed * dt / view.height;
+        p.x = (p.x % 1 + 1) % 1;
+        p.y = (p.y % 1 + 1) % 1;
+      }
+
+      const pointer = fx.pointer;
+      const responding = pointer.active &&
+        state.mode !== "MODAL" && !interactionState.jumping;
+      const distance = Math.hypot(
+        pointer.x - pointer.lastX, pointer.y - pointer.lastY
+      );
+
+      if (responding && fxEnabled("TRAIL") && distance > 0.5 && dt > 0) {
+        const speed = Math.min(2500, distance / dt);
+        fx.trailCredit += (8 + speed * 0.055) *
+          c.TRAIL.STRENGTH * amount * dt;
+        const count = Math.min(8, Math.floor(fx.trailCredit));
+        fx.trailCredit -= Math.floor(fx.trailCredit);
+
+        for (let i = 0; i < count; i++) {
+          const t = (i + 1) / count;
+          fxAddParticle(
+            "TRAIL",
+            pointer.lastX + (pointer.x - pointer.lastX) * t,
+            pointer.lastY + (pointer.y - pointer.lastY) * t,
+            (Math.random() - 0.5) * 14,
+            -6 - Math.random() * 12,
+            0.45 + Math.random() * 0.45
+          );
+        }
+      } else {
+        fx.trailCredit = 0;
+      }
+
+      pointer.lastX = pointer.x;
+      pointer.lastY = pointer.y;
+      fx.lightAlpha += ((responding ? 1 : 0) - fx.lightAlpha) *
+        (1 - Math.exp(-8 * dt));
+
+      if (fxEnabled("DUST") && hero.actualSpeed > 0 && state.mode !== "MODAL") {
+        fx.dustCredit += c.DUST.RATE * c.DUST.STRENGTH * amount * dt;
+        const count = Math.min(3, Math.floor(fx.dustCredit));
+        fx.dustCredit -= Math.floor(fx.dustCredit);
+
+        for (let i = 0; i < count; i++) {
+          // 尘土保存在地图坐标中；镜头移动、背景缩放后仍留在正确脚下位置。
+          fxAddParticle(
+            "DUST",
+            hero.x + (Math.random() - 0.5) * 8,
+            hero.y + Math.random() * 2,
+            (Math.random() - 0.5) * 12,
+            -5 - Math.random() * 6,
+            0.4 + Math.random() * 0.35
+          );
+        }
+      } else {
+        fx.dustCredit = 0;
+      }
+    }
+
+    function drawFXBloom() {
+      if (!fxEnabled("BLOOM")) return;
+
+      const c = CONFIG.FX.BLOOM;
+      const layers = fx.quality < 0.5 ? 1 : 2;
+
+      // 先从未叠加特效的当前帧生成所有副本，避免重复采样上一次的泛光。
+      for (let i = 0; i < layers; i++) {
+        const image = fx.bloom[i];
+        const divisor = (i === 0 ? 4 : 8) *
+          clamp(c.RADIUS, 0.5, 4) / fx.quality;
+        const width = Math.max(1, Math.round(Math.min(640, view.width / divisor)));
+        const height = Math.max(1, Math.round(width * view.height / view.width));
+
+        if (image.width !== width || image.height !== height) {
+          image.width = width;
+          image.height = height;
+        }
+
+        const g = image.getContext("2d");
+        if (!g) continue;
+        g.globalAlpha = 1;
+        g.globalCompositeOperation = "copy";
+        // 平滑仅用于离屏光晕副本；原背景和人物从不被缩小或替换。
+        g.imageSmoothingEnabled = true;
+        g.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, width, height);
+        // RGB 连乘近似保留高亮、抑制暗部，不做像素读取或亮度阈值扫描。
+        g.globalCompositeOperation = "multiply";
+        g.drawImage(image, 0, 0);
+        g.drawImage(image, 0, 0);
+        g.globalCompositeOperation = "source-over";
+      }
+
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      // 这里只柔化附加光晕，save/restore 后原场景仍保持关闭图像平滑。
+      ctx.imageSmoothingEnabled = true;
+
+      for (let i = 0; i < layers; i++) {
+        ctx.globalAlpha = clamp(c.STRENGTH, 0, 0.6) *
+          (layers === 1 ? 1 : (i === 0 ? 0.65 : 0.45));
+        ctx.drawImage(fx.bloom[i], 0, 0, view.width, view.height);
+      }
+
+      ctx.restore();
+    }
+
+    function drawFXSquare(x, y, size) {
+      const grid = Math.max(1, Math.round(CONFIG.FX.PIXEL_GRID));
+      const side = Math.max(grid, Math.round(size / grid) * grid);
+      ctx.fillRect(
+        Math.round((x - side / 2) / grid) * grid,
+        Math.round((y - side / 2) / grid) * grid,
+        side, side
+      );
+    }
+
+    function renderEffects() {
+      if (!CONFIG.FX.ENABLED || !state.ready) return;
+
+      const c = CONFIG.FX;
+      ctx.save();
+      drawFXBloom();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.imageSmoothingEnabled = false;
+
+      if (fxEnabled("WARMTH")) {
+        ctx.globalAlpha = clamp(c.WARMTH.STRENGTH, 0, 0.2);
+        ctx.fillStyle = c.WARMTH.COLOR;
+        ctx.fillRect(0, 0, view.width, view.height);
+      }
+
+      if (fxEnabled("VIGNETTE")) {
+        const key = `${view.width}/${view.height}/${c.VIGNETTE.SIZE}`;
+
+        if (key !== fx.vignetteKey) {
+          const radius = Math.hypot(view.width, view.height) / 2;
+          fx.vignette = ctx.createRadialGradient(
+            view.width / 2, view.height / 2,
+            radius * clamp(c.VIGNETTE.SIZE, 0.1, 0.8),
+            view.width / 2, view.height / 2, radius
+          );
+          fx.vignette.addColorStop(0, "rgba(9, 7, 17, 0)");
+          fx.vignette.addColorStop(0.7, "rgba(9, 7, 17, 0.45)");
+          fx.vignette.addColorStop(1, "rgba(9, 7, 17, 1)");
+          fx.vignetteKey = key;
+        }
+
+        ctx.globalAlpha = clamp(c.VIGNETTE.STRENGTH, 0, 0.8);
+        ctx.fillStyle = fx.vignette;
+        ctx.fillRect(0, 0, view.width, view.height);
+      }
+
+      if (fxEnabled("LIGHT") && fx.lightAlpha > 0.001) {
+        const x = fx.pointer.x;
+        const y = fx.pointer.y;
+        const radius = Math.max(1, c.LIGHT.RADIUS);
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        glow.addColorStop(0, "rgba(255, 211, 140, 0.85)");
+        glow.addColorStop(0.3, "rgba(255, 189, 103, 0.4)");
+        glow.addColorStop(0.7, "rgba(255, 166, 75, 0.1)");
+        glow.addColorStop(1, "rgba(255, 166, 75, 0)");
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = clamp(c.LIGHT.STRENGTH, 0, 0.8) * fx.lightAlpha;
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      }
+
+      if (fxEnabled("AMBIENT")) {
+        ctx.globalCompositeOperation = "screen";
+        ctx.fillStyle = "#ffe3a0";
+
+        for (const p of fx.ambient) {
+          const depth = 0.25 + p.depth * c.AMBIENT.PARALLAX;
+          const x = p.x * (view.width + 160) - 80 +
+            camera.x * view.scale * depth;
+          const y = p.y * (view.height + 160) - 80 +
+            camera.y * view.scale * depth;
+          const flicker = 0.5 + 0.5 * Math.sin(fx.time * 1.1 + p.phase);
+          ctx.globalAlpha = clamp(
+            c.AMBIENT.STRENGTH * (0.25 + flicker * 0.6) *
+            (0.55 + p.depth * 0.45), 0, 1
+          );
+          drawFXSquare(x, y, c.AMBIENT.SIZE * (0.7 + p.depth * 0.8));
+        }
+      }
+
+      for (const p of fx.particles) {
+        if (!fxEnabled(p.kind)) continue;
+
+        const dust = p.kind === "DUST";
+        const point = dust ? toScreen(p.x, p.y) : p;
+        const fade = clamp(p.life / p.maxLife, 0, 1);
+        ctx.globalCompositeOperation = dust ? "source-over" : "screen";
+        ctx.fillStyle = dust ? "#d2b68c" : (p.kind === "CLICK" ? "#ffd387" : "#ffe8b7");
+        ctx.globalAlpha = clamp(
+          fade * fade * CONFIG.FX[p.kind].STRENGTH * (dust ? 0.5 : 0.8), 0, 1
+        );
+        drawFXSquare(
+          point.x + Math.sin(fx.time * 2 + p.phase) * (1 - fade) * 2,
+          point.y,
+          CONFIG.FX[p.kind].SIZE * p.size
+        );
+      }
+
+      ctx.restore();
+    }
+
+    // ===== 【第4轮新增】结束 =====
+
+    function setStatus(extra = "") {
+      // 底部提示文字区块已移除；这里保留空实现，避免旧调用报错。
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+
+      view.width = Math.max(1, rect.width);
+      view.height = Math.max(1, rect.height);
+      view.dpr = Math.min(2, window.devicePixelRatio || 1);
+
+      canvas.width = Math.round(view.width * view.dpr);
+      canvas.height = Math.round(view.height * view.dpr);
+
+      ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+
+      // ===== 【第X轮修改】原来按窗口高度和宽度重新计算 view.scale；现在保留倍数，仅更新居中坐标 =====
+      updateViewPosition();
+      // ===== 【第X轮修改】结束 =====
+
+      hero.resetTracking();
+    }
+
+    function toWorld(x, y) {
+      return {
+        x: (x - view.x) / view.scale,
+        y: (y - view.y) / view.scale
+      };
+    }
+
+    function toScreen(x, y) {
+      return {
+        x: view.x + x * view.scale,
+        y: view.y + y * view.scale
+      };
+    }
+
+    function updatePointer(event) {
+      const rect = canvas.getBoundingClientRect();
+
+      state.mouseX =
+        (event.clientX - rect.left) * view.width / rect.width;
+
+      state.mouseY =
+        (event.clientY - rect.top) * view.height / rect.height;
+
+      // ===== 【第X轮新增】只使用画布上的鼠标位置更新镜头目标，不读取调整面板内的位置 =====
+      camera.mouseX = state.mouseX;
+      camera.mouseY = state.mouseY;
+      camera.active = true;
+      camera.paused = false;
+      // ===== 【第X轮新增】结束 =====
+    }
+
+    function canWalk(x, y) {
+      return !!state.map && isPointInPolygon(
+        x,
+        y,
+        state.map.movableArea.points
+      );
+    }
+
+    function findZone(x, y) {
+      return state.map.interactiveZones.find(zone =>
+        // ===== 【第3轮新增】原来仅检查多边形；现在先排除非 click 区域 =====
+        zone.trigger === "click" &&
+        // ===== 【第3轮新增】结束 =====
+        isPointInPolygon(x, y, zone.points)
+      );
+    }
+
+    function pauseFollowing() {
+      state.followActive = false;
+      hero.stop();
+      hero.resetTracking();
+    }
+
+    function cancelInteraction() {
+      state.pendingZone = null;
+      state.mode = "FOLLOW";
+      pauseFollowing();
+    }
+
+    // =========================================================
+    // 7. 弹窗和输入事件
+    // =========================================================
+
+    // ===== 【第3轮新增】读取外部配置、悬停提示、面向区域中心以及选项跳转 =====
+    function getInteraction(zone) {
+      const source = window.INTERACTIONS;
+      const configured = source && typeof source === "object" &&
+        Object.prototype.hasOwnProperty.call(source, zone.id)
+        ? source[zone.id]
+        : null;
+      const content = configured && typeof configured === "object" &&
+        !Array.isArray(configured) ? configured : null;
+
+      // 本次提供的地图没有 ui 字段，所以为四个现有区域提供默认主题名。
+      // 以后地图中添加了 ui，会优先使用地图的 ui，不需要修改这里。
+      const defaultThemes = {
+        PC: "PC_1_panel",
+        art_1: "art_1_panel",
+        wyy_1: "wyy_1_panel"
+      };
+
+      const name = content && typeof content.name === "string" &&
+        content.name.trim()
+        ? content.name
+        : (zone.name || zone.tip || "交互区域");
+
+      const theme = content && typeof content.theme === "string" &&
+        content.theme.trim()
+        ? content.theme.trim()
+        : (zone.ui || defaultThemes[zone.id] || "default_panel");
+
+      // 跳转网址统一从顶部的 ZONE_LINKS 读取，这里只负责悬停名称和主题。
+      return { name, theme };
+    }
+
+    function hideInteractionHover() {
+      interactionHover.hidden = true;
+      interactionCursor.hidden = true;
+      canvas.classList.remove("interaction-hovering");
+      canvas.style.cursor = "crosshair";
+    }
+
+    function updateInteractionHover() {
+      if (
+        !state.ready ||
+        !interactionState.pointerInside ||
+        state.mode === "MODAL" ||
+        interactionState.jumping
+      ) {
+        hideInteractionHover();
+        return;
+      }
+
+      const point = toWorld(state.mouseX, state.mouseY);
+      const zone = findZone(point.x, point.y);
+
+      if (!zone) {
+        hideInteractionHover();
+        return;
+      }
+
+      const content = getInteraction(zone);
+      interactionHover.textContent = content.name;
+      interactionHover.dataset.theme = content.theme;
+      interactionCursor.dataset.theme = content.theme;
+      interactionHover.hidden = false;
+      interactionCursor.hidden = false;
+      canvas.classList.add("interaction-hovering");
+
+      // 名称在鼠标旁边显示；靠近窗口边缘时向内收，避免文字被裁掉。
+      const width = interactionHover.offsetWidth;
+      const height = interactionHover.offsetHeight;
+      let x = state.mouseX + 30;
+      let y = state.mouseY + 20;
+
+      if (x + width + 8 > view.width) {
+        x = state.mouseX - width - 12;
+      }
+
+      if (y + height + 8 > view.height) {
+        y = state.mouseY - height - 12;
+      }
+
+      interactionHover.style.left =
+        `${clamp(x, 8, Math.max(8, view.width - width - 8))}px`;
+      interactionHover.style.top =
+        `${clamp(y, 8, Math.max(8, view.height - height - 8))}px`;
+      interactionCursor.style.left = `${state.mouseX}px`;
+      interactionCursor.style.top = `${state.mouseY}px`;
+    }
+
+    function activateZone(id) {
+      // 歌单区域：打开黑胶唱片遮罩，等用户在遮罩里再点唱片。
+      if (id === "wyy_1") {
+        openMusicOverlay();
+        return;
+      }
+
+      // 其他区域：人物走到后直接跳转到 ZONE_LINKS 里配置的网页。
+      const url = ZONE_LINKS && typeof ZONE_LINKS[id] === "string"
+        ? ZONE_LINKS[id].trim()
+        : "";
+
+      if (!url) {
+        // 未配置网址时的安全回退：取消前往，不跳转、不抛错。
+        cancelInteraction();
+        setStatus(`未配置【${id}】的跳转网址，请到顶部 ZONE_LINKS 中填写。`);
+        console.warn(`未配置【${id}】的跳转网址，请到顶部 ZONE_LINKS 中填写。`);
+        return;
+      }
+
+      window.location.assign(url);
+    }
+
+    // ===== 【第5轮新增】歌单黑胶唱片遮罩：点歌单出现，点唱片去音乐网站，点空白关闭 =====
+    // 【音乐网址在哪里修改】在脚本顶部的 ZONE_LINKS.wyy_1 里填写，例如：
+    //   wyy_1: "https://music.163.com/#/playlist?id=你的歌单ID"
+    const MUSIC_NOTE_CHARS = ["♪", "♫", "♬", "♩"];
+
+    function openMusicOverlay() {
+      // 遮罩打开期间冻结人物和镜头，避免角色继续走动。
+      state.mode = "MODAL";
+      state.pendingZone = null;
+      pauseFollowing();
+      camera.paused = true;
+
+      musicOverlay.hidden = false;
+      hideInteractionHover();
+
+      if (musicNotes.childElementCount === 0) {
+        // 在唱片周围生成若干音乐符号；位置随机错开，晃动动画交给 CSS。
+        for (let i = 0; i < 8; i++) {
+          const note = document.createElement("span");
+          note.className = "music-note";
+          note.textContent = MUSIC_NOTE_CHARS[i % MUSIC_NOTE_CHARS.length];
+          note.style.left = `${12 + Math.random() * 76}%`;
+          note.style.top = `${10 + Math.random() * 80}%`;
+          note.style.animationDelay = `${(i * 0.18).toFixed(2)}s`;
+          note.style.animationDuration = `${(1.2 + Math.random() * 1.2).toFixed(2)}s`;
+          musicNotes.appendChild(note);
+        }
+      }
+    }
+
+    function closeMusicOverlay() {
+      musicOverlay.hidden = true;
+      hideInteractionHover();
+      cancelInteraction();
+      camera.paused = false;
+    }
+
+    musicOverlay.addEventListener("click", event => {
+      if (event.target === musicOverlay) {
+        // 点到唱片外的暗色空白：关闭遮罩，恢复场景。
+        closeMusicOverlay();
+      } else {
+        // 点到唱片本体（或音乐符号）：在新标签页打开音乐网址。
+        const url = ZONE_LINKS.wyy_1;
+        if (url) window.open(url, "_blank");
+      }
+    });
+    // ===== 【第5轮新增】结束 =====
+
+    // 悬停只属于画布；移到调整面板或离开窗口后立即隐藏气泡。
+    canvas.addEventListener("pointerenter", event => {
+      if (!state.ready || state.mode === "MODAL") return;
+      interactionState.pointerInside = event.pointerType !== "touch";
+      updatePointer(event);
+      updateInteractionHover();
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      interactionState.pointerInside = false;
+      hideInteractionHover();
+    });
+
+    window.addEventListener("blur", () => {
+      interactionState.pointerInside = false;
+      hideInteractionHover();
+    });
+
+    canvas.addEventListener("pointermove", event => {
+      if (!state.ready || state.mode === "MODAL") return;
+
+      updatePointer(event);
+
+      if (state.mode === "FOLLOW") {
+        if (!state.followActive) hero.resetTracking();
+        state.followActive = true;
+      }
+
+      // ===== 【第3轮修改】原来只用 findZone 切换 pointer/crosshair；现在显示名称和纯 CSS 气泡指针 =====
+      interactionState.pointerInside = event.pointerType !== "touch";
+      updateInteractionHover();
+      // ===== 【第3轮修改】结束 =====
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      if (state.mode === "FOLLOW") pauseFollowing();
+    });
+
+    window.addEventListener("blur", () => {
+      if (state.mode === "FOLLOW") pauseFollowing();
+    });
+
+    // ===== 【第X轮新增】离开浏览器内容区域或窗口失焦时，让镜头缓慢回到中心 =====
+    document.documentElement.addEventListener(
+      "pointerleave",
+      returnCameraToCenter
+    );
+
+    window.addEventListener("mouseout", event => {
+      if (!event.relatedTarget) returnCameraToCenter();
+    });
+
+    window.addEventListener("blur", returnCameraToCenter);
+    // ===== 【第X轮新增】结束 =====
+
+    canvas.addEventListener("click", event => {
+      if (!state.ready || state.mode === "MODAL") return;
+
+      updatePointer(event);
+
+      const point = toWorld(state.mouseX, state.mouseY);
+      const zone = findZone(point.x, point.y);
+
+      if (!zone) return;
+
+      // stand 缺失或位于可活动区域外时，就地取消前往，避免走到卡住。
+      if (!zone.stand || !canWalk(zone.stand.x, zone.stand.y)) {
+        cancelInteraction();
+        setStatus(`无法前往【${zone.name}】：stand 缺失或位于可活动区域外。`);
+        return;
+      }
+
+      // 先让人物走到区域，到达后再跳转 / 打开遮罩（见 update 中的到达处理）。
+      state.pendingZone = zone;
+      state.mode = "GOTO";
+      pauseFollowing();
+    });
+
+    window.addEventListener("keydown", event => {
+      const element = document.activeElement;
+
+      if (
+        element &&
+        (
+          /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName) ||
+          element.isContentEditable
+        )
+      ) {
+        return;
+      }
+
+      if (event.key.toLowerCase() === "escape") {
+        if (!musicOverlay.hidden) closeMusicOverlay();
+      }
+    });
+
+    window.addEventListener("resize", resizeCanvas);
+
+    // =========================================================
+    // 8. 更新逻辑
+    // =========================================================
+
+    function update(dt) {
+      if (!state.ready) return;
+
+      // ===== 【第X轮新增】先更新共享视口，再换算人物目标；暂停人物时镜头仍可缓慢回中 =====
+      updateCamera(dt);
+      // ===== 【第X轮新增】结束 =====
+
+      // ===== 【第3轮新增】镜头移动或背景缩放后重算悬停区域，鼠标不动时名称也不会错位 =====
+      updateInteractionHover();
+      // ===== 【第3轮新增】结束 =====
+
+      if (
+        state.mode === "MODAL" ||
+        (state.mode === "FOLLOW" && !state.followActive)
+      ) {
+        hero.stop();
+        return;
+      }
+
+      const target = state.mode === "GOTO"
+        ? state.pendingZone.stand
+        : toWorld(state.mouseX, state.mouseY);
+
+      hero.update(
+        dt,
+        target,
+        state.worldHeight,
+        canWalk,
+        state.mode === "FOLLOW"
+      );
+
+      if (hero.blocked) {
+        if (state.mode === "GOTO") {
+          cancelInteraction();
+          setStatus(
+            "前往路线被多边形边界阻挡。请先移动到合适位置，再点击区域。"
+          );
+        } else {
+          // 停在最后一个合法位置，鼠标再次移动后允许重新尝试
+          pauseFollowing();
+        }
+
+        return;
+      }
+
+      // 必须精确到达原始 stand 后，才触发区域动作（跳转或打开遮罩）。
+      if (
+        state.mode === "GOTO" &&
+        Math.hypot(hero.x - target.x, hero.y - target.y) < 0.0001
+      ) {
+        const zone = state.pendingZone;
+        cancelInteraction();
+        activateZone(zone.id);
+      }
+    }
+
+    // =========================================================
+    // 9. 渲染
+    // =========================================================
+
+    function drawFallbackBackground() {
+      const width = state.worldWidth * view.scale;
+      const height = state.worldHeight * view.scale;
+
+      ctx.fillStyle = "#273847";
+      ctx.fillRect(view.x, view.y, width, height);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(view.x, view.y, width, height);
+      ctx.clip();
+
+      const tile = Math.max(12, 80 * view.scale);
+
+      ctx.strokeStyle = "rgba(160, 190, 210, 0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+
+      for (let x = view.x; x <= view.x + width; x += tile) {
+        ctx.moveTo(x, view.y);
+        ctx.lineTo(x, view.y + height);
+      }
+
+      for (let y = view.y; y <= view.y + height; y += tile) {
+        ctx.moveTo(view.x, y);
+        ctx.lineTo(view.x + width, y);
+      }
+
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function zoneCenter(zone) {
+      let area = 0;
+      let centerX = 0;
+      let centerY = 0;
+
+      for (let i = 0; i < zone.points.length; i++) {
+        const a = zone.points[i];
+        const b = zone.points[(i + 1) % zone.points.length];
+        const cross = a[0] * b[1] - b[0] * a[1];
+
+        area += cross;
+        centerX += (a[0] + b[0]) * cross;
+        centerY += (a[1] + b[1]) * cross;
+      }
+
+      if (Math.abs(area) < 0.000001) {
+        const bounds = getBounds(zone.points);
+
+        return {
+          x: (bounds.minX + bounds.maxX) / 2,
+          y: (bounds.minY + bounds.maxY) / 2
+        };
+      }
+
+      return {
+        x: centerX / (3 * area),
+        y: centerY / (3 * area)
+      };
+    }
+
+    function drawZoneGlows() {
+      if (!state.map) return;
+
+      const now = performance.now();
+      const pulse = 0.5 + 0.5 * Math.sin(now / 420);
+
+      for (const zone of state.map.interactiveZones) {
+        const center = zoneCenter(zone);
+        const p = toScreen(center.x, center.y);
+        const radius = 12 + pulse * 5;
+
+        const glow = ctx.createRadialGradient(
+          p.x, p.y, 0, p.x, p.y, radius
+        );
+
+        glow.addColorStop(0, "rgba(255, 240, 170, 0.95)");
+        glow.addColorStop(0.45, "rgba(255, 210, 120, 0.42)");
+        glow.addColorStop(1, "rgba(255, 200, 100, 0)");
+
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.fillStyle = glow;
+        ctx.fillRect(p.x - radius, p.y - radius, radius * 2, radius * 2);
+
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "rgba(255, 250, 205, 0.9)";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function render() {
+      ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+
+      // ===== 【第X轮修改】原来清屏颜色为 "#101419"；现在使用配置区的纯色底色 =====
+      ctx.fillStyle = CONFIG.BG_COLOR;
+      // ===== 【第X轮修改】结束 =====
+      ctx.fillRect(0, 0, view.width, view.height);
+
+      if (!state.ready) return;
+
+      if (state.background) {
+        ctx.imageSmoothingEnabled = false;
+
+        ctx.drawImage(
+          state.background,
+          view.x,
+          view.y,
+          state.worldWidth * view.scale,
+          state.worldHeight * view.scale
+        );
+      } else {
+        drawFallbackBackground();
+      }
+
+      hero.render(
+        ctx,
+        view,
+        state.worldHeight,
+        state.bounds
+      );
+
+      // ===== 【第5轮新增】每个交互区域中心绘制常驻发光点，指引使用者点击 =====
+      drawZoneGlows();
+      // ===== 【第5轮新增】结束 =====
+
+      // ===== 【第4轮新增】场景完成后叠加特效；所有 DOM 调试面板、悬停提示和弹窗仍在画布之上 =====
+      renderEffects();
+      // ===== 【第4轮新增】结束 =====
+    }
+
+    // =========================================================
+    // 10. 启动：先加载，再校验，再初始化坐标
+    // =========================================================
+
+    async function start() {
+      // ===== 【第6轮新增】开场黑屏 + 敲门声 + 渐隐，其余初始化照常进行 =====
+      runIntro();
+      // ===== 【第6轮新增】结束 =====
+
+      // 立即调整画布，避免停留在默认300×150
+      resizeCanvas();
+      render();
+
+      const [background, character, rawMap] = await Promise.all([
+        loadImage(CONFIG.BACKGROUND_SRC),
+        loadImage(CONFIG.CHARACTER_SRC),
+        loadMapData()
+      ]);
+
+      state.background = background;
+
+      if (background) {
+        state.worldWidth = background.naturalWidth;
+        state.worldHeight = background.naturalHeight;
+      } else {
+        state.notes.push(
+          "背景图片未加载，当前显示生成的占位背景。"
+        );
+      }
+
+      const realMap = normalizeMap(rawMap);
+
+      if (realMap) {
+        state.map = realMap;
+      } else {
+        state.demo = true;
+        state.map = createDemoMap(
+          state.worldWidth,
+          state.worldHeight
+        );
+
+        state.notes.push(
+          "map-data.js 未加载或格式无效，当前为演示地图，不是真实区域数据。"
+        );
+      }
+
+      state.bounds = getBounds(state.map.movableArea.points);
+
+      // 无背景图片时，根据真实地图坐标扩大占位背景，
+      // 避免原地图的1755等较大坐标被放到屏幕外。
+      if (!background && !state.demo) {
+        let maxX = state.bounds.maxX;
+        let maxY = state.bounds.maxY;
+
+        for (const zone of state.map.interactiveZones) {
+          const bounds = getBounds(zone.points);
+          maxX = Math.max(maxX, bounds.maxX);
+          maxY = Math.max(maxY, bounds.maxY);
+        }
+
+        state.worldWidth = Math.max(
+          state.worldWidth,
+          Math.ceil(maxX * 1.05)
+        );
+
+        state.worldHeight = Math.max(
+          state.worldHeight,
+          Math.ceil(maxY * 1.05)
+        );
+      }
+
+      if (!hero.useImage(character)) {
+        state.notes.push(
+          "人物图片未加载或行列配置不匹配，当前使用生成的8方向像素人物。"
+        );
+      }
+
+      let spawn = state.map.movableArea.stand;
+
+      if (!spawn || !canWalk(spawn.x, spawn.y)) {
+        spawn = findInteriorPoint(
+          state.map.movableArea.points
+        );
+
+        state.notes.push(
+          "出生点缺失或位于区域外，已放置到多边形内。"
+        );
+      }
+
+      hero.x = spawn.x;
+      hero.y = spawn.y;
+      hero.targetX = spawn.x;
+      hero.targetY = spawn.y;
+
+      if (
+        background &&
+        (
+          state.bounds.minX < 0 ||
+          state.bounds.minY < 0 ||
+          state.bounds.maxX > state.worldWidth ||
+          state.bounds.maxY > state.worldHeight
+        )
+      ) {
+        state.notes.push(
+          "注意：可活动区域超出背景尺寸，请检查地图坐标与背景是否属于同一套素材。"
+        );
+      }
+
+      state.ready = true;
+
+      // ===== 【第X轮新增】真实背景尺寸确定后，一次性计算默认缩放并读取已保存倍数 =====
+      // 先取得此时的窗口尺寸，避免资源加载期间窗口变化造成默认值过时。
+      resizeCanvas();
+      initializeBackgroundScale();
+      // ===== 【第X轮新增】结束 =====
+
+      resizeCanvas();
+      setStatus();
+      render();
+
+      let lastTime = performance.now();
+
+      function frame(now) {
+        try {
+          // ===== 【第4轮新增】保留真实帧间隔用于自动降质；不改变原人物 dt 算法 =====
+          const effectsFrameSeconds = (now - lastTime) / 1000;
+          // ===== 【第4轮新增】结束 =====
+          const dt = clamp((now - lastTime) / 1000, 0, 0.05);
+          lastTime = now;
+
+          update(dt);
+          // ===== 【第4轮新增】独立更新特效，弹窗导致原 update 提前返回时仍继续运行 =====
+          updateEffects(dt, effectsFrameSeconds);
+          // ===== 【第4轮新增】结束 =====
+          render();
+
+          requestAnimationFrame(frame);
+        } catch (error) {
+          reportError(error);
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    start().catch(reportError);
+  })();
+  </script>
+</body>
+</html>

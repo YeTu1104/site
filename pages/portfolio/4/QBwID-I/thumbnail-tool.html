@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>缩略图批量裁切导出工具</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#16212f; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --ok:#34d399; --warn:#fbbf24; --danger:#f87171; --handle:#ffffff;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  header{
+    padding:10px 16px; display:flex; align-items:center; gap:14px;
+    border-bottom:1px solid var(--line); background:var(--panel);
+    flex-wrap:wrap;
+  }
+  header h1{font-size:16px; margin:0; font-weight:600; letter-spacing:.5px;}
+  header .sub{font-size:12px; color:var(--muted);}
+  .spacer{flex:1;}
+  .btn{
+    border:1px solid var(--line); background:#0b1420; color:var(--text);
+    padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;
+    display:inline-flex; align-items:center; gap:6px; transition:.15s;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn.primary{background:linear-gradient(135deg,#0284c7,#0ea5e9); border-color:#0ea5e9; color:#fff; font-weight:600;}
+  .btn.primary:hover{filter:brightness(1.1);}
+  .btn.danger{color:var(--danger);}
+  .btn.danger:hover{border-color:var(--danger);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+
+  .layout{flex:1; display:grid; grid-template-columns: 360px 1fr; min-height:0;}
+  @media (max-width:860px){ .layout{grid-template-columns:1fr; grid-template-rows:auto 1fr;} body{overflow:auto;} }
+
+  /* left panel */
+  .side{
+    background:var(--panel2); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .drop{
+    margin:12px; padding:18px; border:2px dashed var(--line); border-radius:12px;
+    text-align:center; cursor:pointer; color:var(--muted); font-size:13px;
+    transition:.15s; background:var(--panel);
+  }
+  .drop:hover,.drop.over{border-color:var(--accent); color:var(--text);}
+  .drop b{display:block; font-size:15px; color:var(--text); margin-bottom:4px;}
+
+  .settings{padding:0 12px 12px; border-bottom:1px solid var(--line); display:grid; gap:10px;}
+  .settings .row{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted);}
+  .settings .row label{width:74px; flex:none;}
+  select,input[type=number]{
+    background:#0b1420; color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:6px 8px; font-size:13px;
+  }
+  .fixed-ratio{color:var(--accent2); font-weight:600; font-size:13px;}
+
+  .list-head{display:flex; align-items:center; padding:12px 12px 8px; font-size:12px; color:var(--muted);}
+  .list-head span{font-weight:600;}
+  .list{flex:1; overflow-y:auto; padding:0 12px 12px;}
+  .item{
+    display:flex; gap:10px; align-items:center; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; padding:8px; margin-bottom:8px;
+    cursor:pointer; transition:.12s;
+  }
+  .item.selected{border-color:var(--accent); background:#12263b;}
+  .item .preview{
+    width:52px; height:52px; flex:none; border-radius:6px; overflow:hidden;
+    background:#0b1420; border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:10px;
+  }
+  .item .preview img{width:100%; height:100%; object-fit:cover;}
+  .item .info{flex:1; min-width:0;}
+  .item .fname{font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .item .info input{
+    width:100%; margin-top:5px; background:#0b1420; color:var(--text);
+    border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-size:13px;
+  }
+  .item .acts{display:flex; flex-direction:column; gap:4px; flex:none;}
+  .item .acts button{
+    background:#0b1420; border:1px solid var(--line); color:var(--muted);
+    border-radius:6px; cursor:pointer; font-size:11px; padding:3px 7px;
+  }
+  .item .acts button:hover{color:var(--text); border-color:var(--accent);}
+  .item .acts .del:hover{color:var(--danger); border-color:var(--danger);}
+
+  /* editor */
+  .editor{display:flex; flex-direction:column; min-width:0; min-height:0; position:relative;}
+  .stage{
+    flex:1; min-height:0; position:relative; display:flex; align-items:stretch;
+    background:#0a0f18; overflow:hidden;
+  }
+  canvas#cropCanvas{display:block; width:100%; height:100%; cursor:crosshair; touch-action:none;}
+  .previewdock{
+    position:absolute; top:12px; right:12px; background:rgba(15,23,42,.9);
+    border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center;
+  }
+  .previewdock .lbl{font-size:11px; color:var(--muted); margin-bottom:6px;}
+  .previewdock canvas{background:
+    repeating-conic-gradient(#334155 0 25%, #1e293b 0 50%) 0/16px 16px;
+    border-radius:6px; border:1px solid var(--line); display:block;}
+  .hint{
+    position:absolute; bottom:12px; left:12px; font-size:12px; color:var(--muted);
+    background:rgba(15,23,42,.85); padding:6px 10px; border-radius:8px; border:1px solid var(--line);
+  }
+  .empty{
+    flex:1; display:flex; align-items:center; justify-content:center; color:var(--muted);
+    flex-direction:column; gap:10px; font-size:14px;
+  }
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:#0b1420; border:1px solid var(--accent); color:var(--text);
+    padding:10px 18px; border-radius:10px; font-size:13px; z-index:100;
+    box-shadow:0 6px 24px rgba(0,0,0,.4); opacity:0; pointer-events:none; transition:.2s;
+    max-width:80vw;
+  }
+  .toast.show{opacity:1;}
+  .toast.err{border-color:var(--danger);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>缩略图批量裁切导出工具</h1>
+  <span class="sub">上传原图 → 填编号 → 拖动裁切 → 一键导出</span>
+  <span class="spacer"></span>
+  <button class="btn" id="btnClear">清空列表</button>
+  <button class="btn primary" id="btnExportAll">⬇ 一键导出全部</button>
+</header>
+
+<div class="layout">
+  <!-- Left: upload + settings + list -->
+  <aside class="side">
+    <div class="drop" id="dropZone">
+      <b>点击或拖拽图片到此处</b>
+      支持 JPG / PNG / GIF / WebP，可多选批量加入
+    </div>
+
+    <div class="settings">
+      <div class="row">
+        <label>缩略图比例</label>
+        <span class="fixed-ratio">4:3（固定，与网页缩略图一致）</span>
+      </div>
+      <div class="row">
+        <label>最大边长</label>
+        <input type="number" id="thumbSize" value="400" min="32" max="4096" step="1"> px
+      </div>
+      <div class="row">
+        <label>缩略图格式</label>
+        <select id="fmt">
+          <option value="jpg" selected>JPG（有损，体积小）</option>
+          <option value="png">PNG（无损，支持透明）</option>
+          <option value="webp">WebP（更小）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="list-head"><span>作品队列（<span id="count">0</span>）</span></div>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <!-- Right: crop editor -->
+  <section class="editor">
+    <div class="stage">
+      <div class="empty" id="emptyState">⬆ 先在左侧上传图片</div>
+      <canvas id="cropCanvas" style="display:none"></canvas>
+      <div class="previewdock" id="previewDock" style="display:none">
+        <div class="lbl">缩略图预览</div>
+        <canvas id="previewCanvas" width="120" height="120"></canvas>
+      </div>
+      <div class="hint" id="hint" style="display:none">
+        拖动裁剪框移动 · 拖四角/四边调整大小 · 滚轮或框内看不到缩放
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- state ----------
+  const items = [];        // {id, file, url, img, number, crop:{x0,y0,x1,y1}, origin:{w,h}}
+  let selectedId = null;
+  // 固定为 4:3，与网页 .work-card 的 aspect-ratio 保持一致
+  let settings = { aspect: 4/3, thumb: 400, fmt: 'jpg' };
+
+  // interaction
+  let drag = null;         // {mode:'move'|'resize', handle, startBox, startIx, startIy, startAspect}
+
+  // ---------- dom ----------
+  const $ = (s)=>document.querySelector(s);
+  const dropZone = $('#dropZone'), fileInput = $('#fileInput');
+  const listEl = $('#list'), countEl = $('#count');
+  const canvas = $('#cropCanvas'), ctx = canvas.getContext('2d');
+  const previewCanvas = $('#previewCanvas'), pctx = previewCanvas.getContext('2d');
+  const emptyState = $('#emptyState'), previewDock = $('#previewDock'), hintEl = $('#hint');
+  const toastEl = $('#toast');
+
+  let uid = 0;
+
+  // ---------- helpers ----------
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+  function sanitize(s){
+    return String(s).trim().replace(/[\\\/:*?"<>|\s]/g, '_');
+  }
+  function extOf(name){ const m=/\.([a-z0-9]+)$/i.exec(name); return m?m[1].toLowerCase():'png'; }
+  function toast(msg, isErr){
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show' + (isErr?' err':'');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>toastEl.className='toast', 2800);
+  }
+  function fmtExt(){ return settings.fmt==='png'?'png':(settings.fmt==='webp'?'webp':'jpg'); }
+  function fmtMime(){ return settings.fmt==='png'?'image/png':(settings.fmt==='webp'?'image/webp':'image/jpeg'); }
+
+  // ---------- file handling ----------
+  dropZone.addEventListener('click', ()=>fileInput.click());
+  fileInput.addEventListener('change', ()=>handleFiles(fileInput.files));
+  ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('over'); }));
+  dropZone.addEventListener('drop', e=>{
+    const files = e.dataTransfer.files;
+    if(files && files.length) handleFiles(files);
+  });
+
+  function handleFiles(fileList){
+    const files = Array.from(fileList).filter(f=>f.type.startsWith('image/'));
+    if(!files.length){ toast('未找到图片文件', true); return; }
+    let pending = files.length;
+    files.forEach(file=>{
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = ()=>{
+        const id = 'w'+(++uid);
+        const item = { id, file, url, img, number:'', crop:null, origin:{w:img.naturalWidth, h:img.naturalHeight} };
+        initCrop(item);
+        items.push(item);
+        if(selectedId===null){ selectedId = id; }
+        renderList(); selectItem(selectedId);
+        if(--pending===0) toast('已加入 '+files.length+' 张图片');
+      };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); if(--pending===0){} };
+      img.src = url;
+    });
+    fileInput.value = '';
+  }
+
+  function initCrop(item){
+    const iw = item.origin.w, ih = item.origin.h;
+    const ar = settings.aspect;
+    if(ar){
+      let w,h;
+      if(iw/ih > ar){ h=ih; w=ih*ar; } else { w=iw; h=iw/ar; }
+      const x0=(iw-w)/2, y0=(ih-h)/2;
+      item.crop = { x0, y0, x1:x0+w, y1:y0+h };
+    } else {
+      item.crop = { x0:0, y0:0, x1:iw, y1:ih };
+    }
+  }
+
+  function getItem(id){ return items.find(i=>i.id===id); }
+
+  // ---------- list rendering ----------
+  function renderList(){
+    countEl.textContent = items.length;
+    listEl.innerHTML = '';
+    items.forEach(item=>{
+      const div = document.createElement('div');
+      div.className = 'item' + (item.id===selectedId?' selected':'');
+      div.dataset.id = item.id;
+
+      const prev = document.createElement('div');
+      prev.className='preview';
+      const im = document.createElement('img');
+      im.src = item.url; prev.appendChild(im);
+
+      const info = document.createElement('div');
+      info.className='info';
+      const fn = document.createElement('div');
+      fn.className='fname'; fn.textContent = item.file.name; fn.title = item.file.name;
+      const inp = document.createElement('input');
+      inp.type='text'; inp.placeholder='填写编号，如 01'; inp.value = item.number;
+      inp.addEventListener('input', e=>{ item.number = e.target.value; });
+      inp.addEventListener('click', e=>e.stopPropagation());
+      info.appendChild(fn); info.appendChild(inp);
+
+      const acts = document.createElement('div');
+      acts.className='acts';
+      const b1 = document.createElement('button'); b1.textContent='编辑'; b1.title='编辑裁切';
+      b1.addEventListener('click', e=>{ e.stopPropagation(); selectItem(item.id); });
+      const b2 = document.createElement('button'); b2.textContent='导出';
+      b2.addEventListener('click', e=>{ e.stopPropagation(); selectItem(item.id); exportItem(item); });
+      const b3 = document.createElement('button'); b3.textContent='删除'; b3.className='del';
+      b3.addEventListener('click', e=>{ e.stopPropagation(); removeItem(item.id); });
+      acts.appendChild(b1); acts.appendChild(b2); acts.appendChild(b3);
+
+      div.appendChild(prev); div.appendChild(info); div.appendChild(acts);
+      div.addEventListener('click', ()=>selectItem(item.id));
+      listEl.appendChild(div);
+    });
+  }
+
+  function selectItem(id){
+    selectedId = id;
+    renderList();
+    const item = getItem(id);
+    if(item){
+      emptyState.style.display='none'; previewDock.style.display=''; hintEl.style.display='';
+      canvas.style.display='block';
+      resizeCanvas(); drawEditor(); drawPreview();
+    } else {
+      emptyState.style.display=''; previewDock.style.display='none'; hintEl.style.display='none';
+      canvas.style.display='none';
+      pctx.clearRect(0,0,previewCanvas.width,previewCanvas.height);
+    }
+  }
+
+  function removeItem(id){
+    const idx = items.findIndex(i=>i.id===id);
+    if(idx<0) return;
+    const it = items[idx];
+    URL.revokeObjectURL(it.url);
+    items.splice(idx,1);
+    if(selectedId===id) selectedId = items.length? items[0].id : null;
+    renderList();
+    if(selectedId) selectItem(selectedId); else selectItem(null);
+  }
+
+  $('#btnClear').addEventListener('click', ()=>{
+    if(!items.length){ toast('列表已为空'); return; }
+    items.forEach(it=>URL.revokeObjectURL(it.url));
+    items.length = 0; selectedId = null;
+    renderList(); selectItem(null); toast('已清空列表');
+  });
+
+  // ---------- settings ----------
+  $('#thumbSize').addEventListener('input', e=>{
+    settings.thumb = clamp(parseInt(e.target.value)||400, 32, 4096);
+  });
+  $('#fmt').addEventListener('change', e=>{ settings.fmt = e.target.value; });
+
+  // ---------- canvas sizing/fitting ----------
+  function resizeCanvas(){
+    const r = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio||1;
+    canvas.width = Math.max(1, Math.round(r.width*dpr));
+    canvas.height = Math.max(1, Math.round(r.height*dpr));
+  }
+  window.addEventListener('resize', ()=>{ if(selectedId){ resizeCanvas(); drawEditor(); } });
+
+  function fit(item){
+    const iw = item.origin.w, ih = item.origin.h;
+    const s = Math.min(canvas.width/iw, canvas.height/ih);
+    const dw = iw*s, dh = ih*s;
+    const ox = (canvas.width-dw)/2, oy = (canvas.height-dh)/2;
+    return { s, dw, dh, ox, oy };
+  }
+
+  // ---------- drawing ----------
+  function drawEditor(){
+    const item = getItem(selectedId); if(!item) return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const f = fit(item);
+    ctx.drawImage(item.img, f.ox, f.oy, f.dw, f.dh);
+
+    const {x0,y0,x1,y1} = item.crop;
+    const bx = f.ox + x0*f.s, by = f.oy + y0*f.s;
+    const bw = (x1-x0)*f.s, bh = (y1-y0)*f.s;
+
+    // dim the area outside crop box
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(bx,by,bw,bh);
+    ctx.clip();
+    ctx.drawImage(item.img, f.ox, f.oy, f.dw, f.dh);
+    ctx.restore();
+
+    // border
+    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
+    ctx.strokeRect(bx,by,bw,bh);
+    // grid third lines
+    ctx.strokeStyle = 'rgba(56,189,248,0.35)'; ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(bx+bw/3,by); ctx.lineTo(bx+bw/3,by+bh);
+    ctx.moveTo(bx+2*bw/3,by); ctx.lineTo(bx+2*bw/3,by+bh);
+    ctx.moveTo(bx,by+bh/3); ctx.lineTo(bx+bw,by+bh/3);
+    ctx.moveTo(bx,by+2*bh/3); ctx.lineTo(bx+bw,by+2*bh/3);
+    ctx.stroke();
+    // handles
+    const rd = 9, hw = rd/2;
+    const pts = [[bx,by,'nw'],[bx+bw/2,by,'n'],[bx+bw,by,'ne'],
+                 [bx,by+bh/2,'w'],[bx+bw,by+bh/2,'e'],
+                 [bx,by+bh,'sw'],[bx+bw/2,by+bh,'s'],[bx+bw,by+bh,'se']];
+    ctx.fillStyle='#fff'; ctx.strokeStyle='#0284c7'; ctx.lineWidth=1.5;
+    pts.forEach(([px,py])=>{
+      ctx.beginPath(); ctx.rect(px-hw,py-hw,rd,rd);
+      ctx.fill(); ctx.stroke();
+    });
+
+    // size label
+    const w = Math.round(x1-x0), h = Math.round(y1-y0);
+    ctx.fillStyle='rgba(2,132,199,0.9)';
+    const tag = w+' × '+h;
+    ctx.font='12px monospace';
+    const tw = ctx.measureText(tag).width;
+    const ly = by-10 < 0 ? by+bh+18 : by-8;
+    ctx.fillRect(bx, ly-14, tw+10, 16);
+    ctx.fillStyle='#fff'; ctx.fillText(tag, bx+5, ly-2);
+  }
+
+  function drawPreview(){
+    const item = getItem(selectedId); if(!item) return;
+    const {x0,y0,x1,y1} = item.crop;
+    const srcW = x1-x0, srcH = y1-y0;
+    const pw = previewCanvas.width, ph = previewCanvas.height;
+    const s = Math.min(pw/srcW, ph/srcH);
+    const dw = srcW*s, dh = srcH*s;
+    const ox = (pw-dw)/2, oy=(ph-dh)/2;
+    pctx.clearRect(0,0,pw,ph);
+    pctx.drawImage(item.img, x0,y0,srcW,srcH, ox,oy,dw,dh);
+  }
+
+  // ---------- pointer interaction ----------
+  function canvasToImage(e, item, f){
+    const r = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio||1;
+    const mx = (e.clientX - r.left)*dpr;
+    const my = (e.clientY - r.top)*dpr;
+    const ix = (mx - f.ox)/f.s;
+    const iy = (my - f.oy)/f.s;
+    return { ix: clamp(ix,0,item.origin.w), iy: clamp(iy,0,item.origin.h) };
+  }
+
+  function hitTest(item, f, ix, iy){
+    const {x0,y0,x1,y1} = item.crop;
+    const rd = 9 / f.s; // in image px
+    const cx = (x0+x1)/2, cy=(y0+y1)/2;
+    const near = (px,py)=>Math.abs(ix-px)<=rd && Math.abs(iy-py)<=rd;
+    // corners & edges
+    if(near(x0,y0)) return 'nw';
+    if(near(x1,y0)) return 'ne';
+    if(near(x0,y1)) return 'sw';
+    if(near(x1,y1)) return 'se';
+    if(Math.abs(iy-y0)<=rd && ix>x0+rd && ix<x1-rd) return 'n';
+    if(Math.abs(iy-y1)<=rd && ix>x0+rd && ix<x1-rd) return 's';
+    if(Math.abs(ix-x0)<=rd && iy>y0+rd && iy<y1-rd) return 'w';
+    if(Math.abs(ix-x1)<=rd && iy>y0+rd && iy<y1-rd) return 'e';
+    if(ix>x0 && ix<x1 && iy>y0 && iy<y1) return 'move';
+    return null;
+  }
+
+  canvas.addEventListener('pointerdown', e=>{
+    const item = getItem(selectedId); if(!item) return;
+    canvas.setPointerCapture(e.pointerId);
+    const f = fit(item);
+    const {ix,iy} = canvasToImage(e,item,f);
+    const h = hitTest(item,f,ix,iy);
+    if(!h) return;
+    drag = { mode:(h==='move'?'move':'resize'), handle:h, startBox:{...item.crop}, startIx:ix, startIy:iy };
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    const item = getItem(selectedId); if(!item || !drag) return;
+    const f = fit(item);
+    const {ix,iy} = canvasToImage(e,item,f);
+    if(drag.mode==='move'){
+      const box = drag.startBox;
+      const w = box.x1-box.x0, h = box.y1-box.y0;
+      let nx0 = box.x0 + (ix-drag.startIx);
+      let ny0 = box.y0 + (iy-drag.startIy);
+      nx0 = clamp(nx0, 0, item.origin.w - w);
+      ny0 = clamp(ny0, 0, item.origin.h - h);
+      item.crop = { x0:nx0, y0:ny0, x1:nx0+w, y1:ny0+h };
+    } else {
+      item.crop = computeResize(item, drag.handle, drag.startBox, ix, iy);
+    }
+    drawEditor(); drawPreview();
+    // dynamic cursor
+    const h = hitTest(item, f, ix, iy) || drag.handle;
+    canvas.style.cursor = h==='move' ? 'move' : (h?'nwse-resize':'crosshair');
+  });
+
+  canvas.addEventListener('pointerup', e=>{ drag = null; canvas.style.cursor='crosshair'; });
+  canvas.addEventListener('pointercancel', ()=>{ drag = null; });
+
+  const MINP = 12;
+  function computeResize(item, handle, box0, px, py){
+    const iw = item.origin.w, ih = item.origin.h;
+    const ar = settings.aspect;
+    let {x0,y0,x1,y1} = box0;
+    const cx=(x0+x1)/2, cy=(y0+y1)/2;
+    px = clamp(px,0,iw); py = clamp(py,0,ih);
+
+    const mW = handle.indexOf('w')>=0, mE = handle.indexOf('e')>=0;
+    const mN = handle.indexOf('n')>=0, mS = handle.indexOf('s')>=0;
+
+    let ax = mW ? x1 : (mE ? x0 : cx);
+    let ay = mN ? y1 : (mS ? y0 : cy);
+
+    if(ar){
+      const rawW = Math.max(Math.abs(px-ax), MINP);
+      const rawH = Math.max(Math.abs(py-ay), MINP);
+      const w = Math.max(rawW, rawH*ar);
+      const h = w/ar;
+      if(mW){ x1=ax; x0=ax-w; }
+      else if(mE){ x0=ax; x1=ax+w; }
+      else { x0=ax-w/2; x1=ax+w/2; }
+      if(mN){ y1=ay; y0=ay-h; }
+      else if(mS){ y0=ay; y1=ay+h; }
+      else { y0=ay-h/2; y1=ay+h/2; }
+    } else {
+      if(mW) x0 = Math.min(px, x1-MINP);
+      if(mE) x1 = Math.max(px, x0+MINP);
+      if(mN) y0 = Math.min(py, y1-MINP);
+      if(mS) y1 = Math.max(py, y0+MINP);
+    }
+
+    // clamp within image bounds
+    x0 = clamp(x0,0,iw); y0 = clamp(y0,0,ih);
+    x1 = clamp(x1,0,iw); y1 = clamp(y1,0,ih);
+    if(x1-x0 < MINP){ if(mW || mE){ (mW? (x0=x1-MINP):(x1=x0+MINP)); } else { x0=cx-MINP/2; x1=cx+MINP/2; } x0=clamp(x0,0,iw); x1=clamp(x1,0,iw); }
+    if(y1-y0 < MINP){ if(mN || mS){ (mN? (y0=y1-MINP):(y1=y0+MINP)); } else { y0=cy-MINP/2; y1=cy+MINP/2; } y0=clamp(y0,0,ih); y1=clamp(y1,0,ih); }
+    return { x0,y0,x1,y1 };
+  }
+
+  // ---------- export ----------
+  function makeThumbBlob(item, cb){
+    const {x0,y0,x1,y1} = item.crop;
+    const sw = x1-x0, sh = y1-y0;
+    const maxEdge = settings.thumb;
+    let tw, th;
+    if(sw>=sh){ tw=maxEdge; th=Math.max(1,Math.round(maxEdge*sh/sw)); }
+    else { th=maxEdge; tw=Math.max(1,Math.round(maxEdge*sw/sh)); }
+    const c = document.createElement('canvas');
+    c.width=tw; c.height=th;
+    const cctx = c.getContext('2d');
+    cctx.imageSmoothingEnabled = true;
+    cctx.imageSmoothingQuality = 'high';
+    cctx.drawImage(item.img, x0,y0,sw,sh, 0,0,tw,th);
+    if(settings.fmt==='png'){
+      c.toBlob(b=>cb(b), 'image/png');
+    } else {
+      c.toBlob(b=>cb(b), fmtMime(), 0.9);
+    }
+  }
+
+  function namesOf(item){
+    const num = sanitize(item.number);
+    if(!num) return null;
+    const origExt = extOf(item.file.name);
+    const thExt = fmtExt();
+    return { thumb:'suolue-'+num+'.'+thExt, full:num+'.'+origExt };
+  }
+
+  function triggerDownload(name, blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 600);
+  }
+
+  function exportItem(item, zip){
+    const names = namesOf(item);
+    if(!names){
+      if(!zip) toast('请先填写编号：'+item.file.name, true);
+      return Promise.resolve(false);
+    }
+    return new Promise(resolve=>{
+      makeThumbBlob(item, (thumbBlob)=>{
+        if(zip){
+          zip.file(names.thumb, thumbBlob);
+          zip.file(names.full, item.file);
+        } else {
+          triggerDownload(names.thumb, thumbBlob);
+          // original: raw file (lossless rename)
+          const url = URL.createObjectURL(item.file);
+          const a = document.createElement('a');
+          a.href = url; a.download = names.full;
+          document.body.appendChild(a);
+          setTimeout(()=>{ a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }, 120);
+        }
+        resolve(true);
+      });
+    });
+  }
+
+  $('#btnExportAll').addEventListener('click', async ()=>{
+    if(!items.length){ toast('列表为空，请先上传图片', true); return; }
+    const missing = items.filter(i=>!sanitize(i.number)).length;
+    if(missing){ toast('有 '+missing+' 项未填写编号，将忽略这些项（仍会导出已填编号的）', true); }
+
+    if(window.JSZip){
+      const zip = new JSZip();
+      let done = 0;
+      for(const it of items){ if(await exportItem(it, zip)) done++; }
+      if(done===0){ toast('没有可导出的项目（请填写编号）', true); return; }
+      const blob = await zip.generateAsync({type:'blob'});
+      triggerDownload('缩略图导出.zip', blob);
+      toast('已导出 '+done+' 组文件（每组含原图 + 缩略图）');
+    } else {
+      // fallback: sequential single downloads
+      let done = 0;
+      for(const it of items){ const ok = await exportItem(it, null); if(ok) done++; }
+      toast(done? '已启动 '+done+' 组文件下载（JSZip 未加载，逐个下载）' : '没有可导出的项目', !done);
+    }
+  });
+
+  selectItem(null);
+})();
+</script>
+</body>
+</html>

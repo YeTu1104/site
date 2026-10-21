@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>像素生活板 · 修改工作台</title>
+<style>
+  :root {
+    --ink: #513923;
+    --muted: #796044;
+    --line: #a98a5f;
+    --cream: #fffaf0;
+    --paper: #fff0c9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: #f3ead6;
+    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    font-size: 15px;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--paper);
+    border-bottom: 3px solid #795033;
+    padding: 12px 18px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 20px;
+    margin: 0;
+    letter-spacing: 1px;
+  }
+  header .steps {
+    font-size: 12px;
+    color: var(--muted);
+    width: 100%;
+  }
+  button {
+    font: inherit;
+    cursor: pointer;
+    min-height: 40px;
+    border: 2px solid #795033;
+    border-radius: 3px;
+    padding: 8px 14px;
+    color: var(--ink);
+    background: #fff0c9;
+    box-shadow: 0 3px 0 #85532f;
+    font-weight: 700;
+  }
+  button:hover { background: #fff8e6; }
+  button:active:not(:disabled) {
+    translate: 0 2px;
+    box-shadow: 0 1px 0 #85532f;
+  }
+  button.primary {
+    color: #fff9e9;
+    background: #577846;
+    border-color: #374f2e;
+    box-shadow: 0 3px 0 #354e2c;
+  }
+  button.primary:hover { background: #668853; }
+  button.danger {
+    background: #f6d9d4;
+    border-color: #9c4a3e;
+    box-shadow: 0 3px 0 #7c352b;
+    color: #7c2d22;
+  }
+  button.mini {
+    min-height: 30px;
+    padding: 3px 9px;
+    font-size: 12px;
+    box-shadow: 0 2px 0 #85532f;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .card {
+    background: var(--cream);
+    border: 2px solid var(--line);
+    box-shadow: 4px 4px 0 #85532f33;
+    border-radius: 4px;
+    padding: 16px 18px 18px;
+  }
+  .card h2 {
+    margin: 0 0 4px;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 2px solid #795033;
+    border-radius: 3px;
+    background: #ffe88f;
+    font-size: 13px;
+  }
+  .card .tip {
+    margin: 0 0 14px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  input[type="text"], textarea {
+    font: inherit;
+    color: var(--ink);
+    border: 2px solid var(--line);
+    border-radius: 3px;
+    background: #fffdf6;
+    padding: 7px 9px;
+    width: 100%;
+  }
+  textarea { resize: vertical; line-height: 1.6; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 3px solid #164f62;
+    outline-offset: 2px;
+  }
+  label.field {
+    display: block;
+    margin: 10px 0;
+  }
+  label.field span {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .ops {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  /* 便签 */
+  .note-item {
+    border: 2px dashed #c9b48c;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #fffdf6;
+  }
+  .note-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .note-head .nid {
+    font-size: 11px;
+    color: var(--muted);
+    margin-right: auto;
+  }
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border: 2px solid #795033;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: none;
+    min-height: 0;
+  }
+  .swatch.sel {
+    outline: 3px solid #164f62;
+    outline-offset: 1px;
+  }
+  /* 日程 */
+  .sched-row .day-in { width: 130px; flex-shrink: 0; }
+  /* 月历 */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 38px);
+    gap: 5px;
+    margin: 12px 0 8px;
+  }
+  .cal-day {
+    width: 38px;
+    height: 34px;
+    min-height: 0;
+    padding: 0;
+    box-shadow: 0 2px 0 #85532f;
+    background: #fffdf6;
+    font-weight: 700;
+  }
+  .cal-day.busy {
+    background: #c94f45;
+    border-color: #8f3229;
+    color: #fffdf2;
+    box-shadow: 0 2px 0 #6f241d;
+  }
+  .cal-day.free {
+    background: #6f9c55;
+    border-color: #4c7238;
+    color: #fffdf2;
+    box-shadow: 0 2px 0 #3a5a2a;
+  }
+  .cal-legend {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 4px 0 0;
+  }
+  .dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    vertical-align: -1px;
+    margin: 0 3px 0 10px;
+    border: 1px solid #79503366;
+  }
+  .dot.r { background: #c94f45; }
+  .dot.g { background: #6f9c55; }
+  /* 拍立得 */
+  .pol-wrap {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .pol-photo {
+    width: 180px;
+    aspect-ratio: 3 / 4;
+    border: 2px solid #cfc3ae;
+    background: #efe8da;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #b3a58c;
+    font-size: 12px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .pol-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .pol-fields { flex: 1; min-width: 260px; }
+  .pol-btns { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  /* 预览 */
+  #previewFrame {
+    width: 100%;
+    height: 540px;
+    border: 2px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+  }
+  #fileStatus {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  #fileStatus.ok { color: #3f6d2e; font-weight: 700; }
+  #emptyHint {
+    border: 3px dashed #b39878;
+    border-radius: 6px;
+    background: #fff6e0;
+    padding: 34px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 2;
+  }
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%);
+    background: #513923;
+    color: #fff3d4;
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    max-width: 86vw;
+    z-index: 99;
+  }
+  #toast.show { opacity: 1; }
+  .hidden-input { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>像素生活板 · 修改工作台</h1>
+  <button id="btnImport">① 导入 index.html</button>
+  <button id="btnPreview">生成预览</button>
+  <button id="btnExport" class="primary">③ 导出新的 index.html</button>
+  <span id="fileStatus">尚未导入文件</span>
+  <div class="steps">使用步骤：① 导入当前文件夹里的 index.html → ② 在下方四个区域修改内容 → ③ 导出并下载新的 index.html，用它覆盖旧文件（建议先备份一份旧文件）。</div>
+</header>
+
+<input type="file" id="fileInput" class="hidden-input" accept=".html,text/html" />
+
+<main>
+  <div id="emptyHint">
+    还没有导入文件。<br />
+    请点击上方「① 导入 index.html」，选择生活板文件夹里的 index.html。<br />
+    导入成功后，就可以修改便签、日程、月历和拍立得了。
+  </div>
+
+  <div id="editor" style="display:none;">
+    <section class="card" id="secNotes">
+      <h2><span class="num">1</span>便签纸（内容 / 颜色 / 数量）</h2>
+      <p class="tip">修改文字、点色块换颜色、点「新增便签」加一张、点「删除」去掉一张。上下箭头调整顺序。</p>
+      <div id="notesList"></div>
+      <button id="btnAddNote" class="mini">＋ 新增便签</button>
+    </section>
+
+    <section class="card" id="secSchedule">
+      <h2><span class="num">2</span>本周日程</h2>
+      <p class="tip">修改标题、每一行的「星期」和「内容」、底部小结文字。可增删行、调整顺序。</p>
+      <label class="field"><span>日程标题</span><input type="text" id="schedTitle" /></label>
+      <div id="schedRows"></div>
+      <button id="btnAddSched" class="mini">＋ 添加一行</button>
+      <label class="field"><span>底部小结文字</span><input type="text" id="schedFoot" /></label>
+    </section>
+
+    <section class="card" id="secCalendar">
+      <h2><span class="num">3</span>忙碌闲暇表 + 月历标题</h2>
+      <p class="tip">先改标题（例如 MONTH: OCTOBER），再点日期格子切换状态：普通 → 忙碌（红） → 闲暇（绿） → 普通。</p>
+      <label class="field"><span>月历标题</span><input type="text" id="monthTitle" /></label>
+      <div class="cal-grid" id="calGrid"></div>
+      <p class="cal-legend">
+        <span class="dot r"></span>忙碌
+        <span class="dot g"></span>闲暇
+        <span id="calCount"></span>
+        <button id="btnCalClear" class="mini" style="margin-left:14px;">全部清除标记</button>
+      </p>
+    </section>
+
+    <section class="card" id="secPolaroid">
+      <h2><span class="num">4</span>拍立得（照片 / 名字 / 介绍 / 网址）</h2>
+      <p class="tip">上传照片会自动压缩后内嵌进网页；名字显示在照片下方；介绍和网址显示在点开后的背面。</p>
+      <div class="pol-wrap">
+        <div>
+          <div class="pol-photo" id="polPhotoBox"><span>3:4 照片占位<br />图片待补充</span></div>
+          <div class="pol-btns">
+            <button id="btnPolUpload" class="mini">上传照片</button>
+            <button id="btnPolRemove" class="mini danger">移除照片</button>
+          </div>
+        </div>
+        <div class="pol-fields">
+          <label class="field"><span>名字（照片下方 & 背面标题）</span><input type="text" id="polName" /></label>
+          <label class="field"><span>介绍（背面文字，可换行）</span><textarea id="polIntro" rows="4"></textarea></label>
+          <label class="field"><span>网址链接（背面可点开的链接）</span><input type="text" id="polUrl" /></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="secPreview">
+      <h2><span class="num">5</span>效果预览</h2>
+      <p class="tip">点击下方「生成预览」查看修改后的效果（预览里木板背景图可能不显示，属正常现象）。</p>
+      <button id="btnPreview2" class="mini">生成预览</button>
+      <div style="margin-top:10px;">
+        <iframe id="previewFrame" title="预览"></iframe>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const toastEl = $("toast");
+  let toastTimer;
+  function toast(msg) {
+    clearTimeout(toastTimer);
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 4200);
+  }
+
+  // ---------- 状态 ----------
+  let srcText = null;      // 导入的 index.html 原文
+  let fileName = "";
+  let data = null;
+  // data = {
+  //   notes:[{id,text,color,u,v,z}], assets, canvasMinHeight, polaroidPos,
+  //   schedTitle, schedRows:[[day,text]], schedFoot,
+  //   monthTitle, busy:[], free:[],
+  //   pol:{name,intro,url,photo?}
+  // }
+
+  const NOTE_COLORS = [
+    ["pink", "粉色", "#f6b9bd"],
+    ["blue", "浅蓝", "#b9def0"],
+    ["yellow", "鹅黄", "#ffe88f"],
+    ["green", "浅绿", "#cfe898"],
+    ["cream", "奶油色", "#f9e9c9"]
+  ];
+
+  // ---------- 工具 ----------
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  // 生成写入 index.html 的 JS 字符串字面量（JSON 语法即合法 JS，额外转义 < 与行分隔符）
+  function jsStr(s) {
+    return JSON.stringify(String(s == null ? "" : s))
+      .replace(/</g, () => "\\u003c")
+      .replace(/\u2028/g, () => "\\u2028")
+      .replace(/\u2029/g, () => "\\u2029");
+  }
+  // 解析从 index.html 里抓到的 JS 字符串字面量内容（不含外侧引号）
+  function unesc(inner) {
+    try { return JSON.parse('"' + inner + '"'); }
+    catch (e) { return inner.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\"); }
+  }
+  function matchOne(text, re, name) {
+    const m = text.match(re);
+    if (!m) throw new Error("无法识别「" + name + "」部分，文件可能不是当前版本的 index.html");
+    return m;
+  }
+
+  // ---------- 导入解析 ----------
+  function parseSource(text) {
+    const d = {};
+
+    // 1) board-data JSON：便签 + 拍立得位置 + 素材
+    const bd = matchOne(text, /<script type="application\/json" id="board-data">([\s\S]*?)<\/script>/, "便签数据");
+    const board = JSON.parse(bd[1]);
+    d.assets = board.assets || { schedule: "", calendar: "" };
+    d.canvasMinHeight = board.canvasMinHeight != null ? board.canvasMinHeight : 240;
+    d.notes = (board.notes || []).map(n => ({
+      id: n.id, text: n.text, color: n.color, u: n.u, v: n.v, z: n.z
+    }));
+    d.polaroidPos = board.polaroid || { u: 0.8, v: 0.55, z: 10 };
+
+    // 2) 本周日程（整个 makeSchedule 函数）
+    const sch = matchOne(text, /function makeSchedule\(\) \{[\s\S]*?\n  \}/, "本周日程")[0];
+    d.schedTitle = unesc(matchOne(sch, /el\("h2", "schedule-title", "((?:[^"\\]|\\.)*)"\)/, "日程标题")[1]);
+    d.schedFoot = unesc(matchOne(sch, /el\("p", "schedule-foot", "((?:[^"\\]|\\.)*)"\)/, "日程小结")[1]);
+    const lm = matchOne(sch, /const lines = el\("div", "schedule-lines"\);\s*(\[[\s\S]*?\])\s*\.forEach\(\(\[day, text\]\)/, "日程内容");
+    let rows;
+    try { rows = JSON.parse(lm[1]); }
+    catch (e) { rows = new Function("return " + lm[1])(); }
+    d.schedRows = rows.map(r => [String(r[0]), String(r[1])]);
+
+    // 3) 月历标题 + 忙碌闲暇表
+    const cal = matchOne(text, /function makeCalendar\(\) \{[\s\S]*?\n  \}/, "月历")[0];
+    d.monthTitle = unesc(matchOne(cal, /el\("div", "calendar-title", "((?:[^"\\]|\\.)*)"\)/, "月历标题")[1]);
+    const bf = matchOne(text, /const busyFree = \{\s*busy: \[([^\]]*)\],\s*free: \[([^\]]*)\]\s*\};/, "忙碌闲暇表");
+    d.busy = bf[1].split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    d.free = bf[2].split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+
+    // 4) 拍立得
+    const pd = matchOne(text, /const polaroidData = \{([\s\S]*?)\n  \};/, "拍立得数据")[1];
+    const get = k => {
+      const m = pd.match(new RegExp(k + ":\\s*\"((?:[^\"\\\\]|\\\\.)*)\""));
+      return m ? unesc(m[1]) : undefined;
+    };
+    d.pol = { name: get("name"), intro: get("intro"), url: get("url"), photo: get("photo") };
+
+    return d;
+  }
+
+  // ---------- 导入 ----------
+  $("fileInput").addEventListener("change", e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        data = parseSource(String(rd.result));
+        srcText = String(rd.result);
+        fileName = f.name;
+        $("emptyHint").style.display = "none";
+        $("editor").style.display = "flex";
+        $("editor").style.flexDirection = "column";
+        $("editor").style.gap = "22px";
+        const st = $("fileStatus");
+        st.textContent = "已导入：" + fileName + "（便签 " + data.notes.length + " 张）";
+        st.classList.add("ok");
+        renderAll();
+        toast("导入成功，可以开始修改了");
+      } catch (err) {
+        alert("导入失败：" + err.message);
+      }
+    };
+    rd.readAsText(f, "utf-8");
+  });
+  $("btnImport").addEventListener("click", () => $("fileInput").click());
+
+  function needFile() {
+    if (!data) { alert("请先导入 index.html"); return true; }
+    return false;
+  }
+
+  // ---------- 渲染 ----------
+  function renderAll() {
+    renderNotes();
+    renderSched();
+    renderCal();
+    renderPol();
+  }
+
+  function renderNotes() {
+    const box = $("notesList");
+    box.innerHTML = "";
+    data.notes.forEach((n, i) => {
+      const item = document.createElement("div");
+      item.className = "note-item";
+      const swatches = NOTE_COLORS.map(([key, name, hex]) =>
+        '<button type="button" class="swatch' + (n.color === key ? " sel" : "") + '" data-act="color" data-key="' + key + '" title="' + name + '" style="background:' + hex + '"></button>'
+      ).join("");
+      item.innerHTML =
+        '<div class="note-head"><span class="nid">便签 ' + (i + 1) + '</span>' + swatches +
+        '<span style="flex-basis:100%;height:0;"></span></div>' +
+        '<div class="row"><div class="grow"><textarea rows="2" data-act="text">' + esc(n.text) + '</textarea></div>' +
+        '<div class="ops">' +
+        '<button type="button" class="mini" data-act="up" title="上移">↑</button>' +
+        '<button type="button" class="mini" data-act="down" title="下移">↓</button>' +
+        '<button type="button" class="mini danger" data-act="del" title="删除">✕</button>' +
+        '</div></div>';
+      item.querySelector('[data-act="text"]').addEventListener("input", e => { n.text = e.target.value; });
+      item.addEventListener("click", e => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        const act = b.dataset.act;
+        if (act === "color") { n.color = b.dataset.key; renderNotes(); }
+        else if (act === "del") { data.notes.splice(i, 1); renderNotes(); }
+        else if (act === "up" && i > 0) { data.notes.splice(i - 1, 0, data.notes.splice(i, 1)[0]); renderNotes(); }
+        else if (act === "down" && i < data.notes.length - 1) { data.notes.splice(i + 1, 0, data.notes.splice(i, 1)[0]); renderNotes(); }
+      });
+      box.append(item);
+    });
+  }
+  $("btnAddNote").addEventListener("click", () => {
+    if (needFile()) return;
+    const maxZ = data.notes.reduce((m, n) => Math.max(m, n.z || 0), 0);
+    data.notes.push({
+      id: "wb" + Math.random().toString(36).slice(2, 8),
+      text: "新便签",
+      color: "yellow",
+      u: null, v: null,
+      z: maxZ + 1
+    });
+    renderNotes();
+  });
+
+  function renderSched() {
+    $("schedTitle").value = data.schedTitle;
+    $("schedFoot").value = data.schedFoot;
+    const box = $("schedRows");
+    box.innerHTML = "";
+    data.schedRows.forEach((r, i) => {
+      const row = document.createElement("div");
+      row.className = "row sched-row";
+      row.innerHTML =
+        '<input type="text" class="day-in" data-act="day" value="' + esc(r[0]) + '" placeholder="周一 MON" />' +
+        '<div class="grow"><input type="text" data-act="txt" value="' + esc(r[1]) + '" placeholder="要做的事" /></div>' +
+        '<div class="ops">' +
+        '<button type="button" class="mini" data-act="up">↑</button>' +
+        '<button type="button" class="mini" data-act="down">↓</button>' +
+        '<button type="button" class="mini danger" data-act="del">✕</button>' +
+        '</div>';
+      row.querySelector('[data-act="day"]').addEventListener("input", e => { r[0] = e.target.value; });
+      row.querySelector('[data-act="txt"]').addEventListener("input", e => { r[1] = e.target.value; });
+      row.addEventListener("click", e => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        const act = b.dataset.act;
+        if (act === "del") { data.schedRows.splice(i, 1); renderSchedKeepFocus(); }
+        else if (act === "up" && i > 0) { data.schedRows.splice(i - 1, 0, data.schedRows.splice(i, 1)[0]); renderSchedKeepFocus(); }
+        else if (act === "down" && i < data.schedRows.length - 1) { data.schedRows.splice(i + 1, 0, data.schedRows.splice(i, 1)[0]); renderSchedKeepFocus(); }
+      });
+      box.append(row);
+    });
+  }
+  function renderSchedKeepFocus() {
+    const t = data.schedTitle, f = data.schedFoot;
+    renderSched();
+    $("schedTitle").value = t; $("schedFoot").value = f;
+  }
+  $("schedTitle").addEventListener("input", e => { data.schedTitle = e.target.value; });
+  $("schedFoot").addEventListener("input", e => { data.schedFoot = e.target.value; });
+  $("btnAddSched").addEventListener("click", () => {
+    if (needFile()) return;
+    data.schedRows.push(["", ""]);
+    renderSched();
+  });
+
+  function renderCal() {
+    $("monthTitle").value = data.monthTitle;
+    const g = $("calGrid");
+    g.innerHTML = "";
+    for (let day = 1; day <= 30; day++) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "cal-day";
+      b.textContent = day;
+      const isBusy = data.busy.includes(day), isFree = data.free.includes(day);
+      if (isBusy) b.classList.add("busy");
+      else if (isFree) b.classList.add("free");
+      b.title = "点击切换：普通 → 忙碌 → 闲暇";
+      b.addEventListener("click", () => {
+        const bi = data.busy.indexOf(day), fi = data.free.indexOf(day);
+        if (bi < 0 && fi < 0) data.busy.push(day);
+        else if (bi >= 0) { data.busy.splice(bi, 1); data.free.push(day); }
+        else { data.free.splice(fi, 1); }
+        renderCal();
+      });
+      g.append(b);
+    }
+    $("calCount").textContent = "（本月忙碌 " + data.busy.length + " 天 · 闲暇 " + data.free.length + " 天）";
+  }
+  $("monthTitle").addEventListener("input", e => { data.monthTitle = e.target.value; });
+  $("btnCalClear").addEventListener("click", () => {
+    if (needFile()) return;
+    data.busy = []; data.free = []; renderCal();
+  });
+
+  function renderPol() {
+    const box = $("polPhotoBox");
+    if (data.pol.photo) box.innerHTML = '<img src="' + data.pol.photo + '" alt="拍立得照片预览" />';
+    else box.innerHTML = "<span>3:4 照片占位<br />图片待补充</span>";
+    $("polName").value = data.pol.name;
+    $("polIntro").value = data.pol.intro;
+    $("polUrl").value = data.pol.url;
+  }
+  $("polName").addEventListener("input", e => { data.pol.name = e.target.value; });
+  $("polIntro").addEventListener("input", e => { data.pol.intro = e.target.value; });
+  $("polUrl").addEventListener("input", e => { data.pol.url = e.target.value; });
+
+  // 上传照片：压缩到最长边 1200 后转 dataURL
+  const polFile = document.createElement("input");
+  polFile.type = "file";
+  polFile.accept = "image/*";
+  polFile.className = "hidden-input";
+  document.body.append(polFile);
+  $("btnPolUpload").addEventListener("click", () => { if (!needFile()) polFile.click(); });
+  $("btnPolRemove").addEventListener("click", () => {
+    if (needFile()) return;
+    data.pol.photo = undefined;
+    renderPol();
+    toast("已移除照片（导出后将显示占位文字）");
+  });
+  polFile.addEventListener("change", e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1200;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        data.pol.photo = cv.toDataURL("image/jpeg", 0.85);
+        renderPol();
+        toast("照片已载入（已自动压缩）。点击导出后会嵌入网页。");
+      };
+      img.onerror = () => alert("图片读取失败，请换一张试试");
+      img.src = String(rd.result);
+    };
+    rd.readAsDataURL(f);
+  });
+
+  // ---------- 代码生成 ----------
+  function buildScheduleFn(title, rows, foot) {
+    const rowSrc = rows.map((r, i) =>
+      "      [" + jsStr(r[0]) + ", " + jsStr(r[1]) + "]" + (i < rows.length - 1 ? "," : "")
+    ).join("\n");
+    return '' +
+'  function makeSchedule() {\n' +
+'    const imported = Boolean(state.assets.schedule);\n' +
+'    const sheet = el("div", "schedule" + (imported ? " imported" : ""));\n' +
+'    if (imported) {\n' +
+'      const img = localImage(state.assets.schedule, "从素材 B 单独裁切的本周日程纸张");\n' +
+'      img.addEventListener("load", () => {\n' +
+'        sheet.style.aspectRatio = img.naturalWidth + " / " + img.naturalHeight;\n' +
+'      });\n' +
+'      sheet.append(img);\n' +
+'    } else {\n' +
+'      sheet.append(el("h2", "schedule-title", ' + jsStr(title) + '));\n' +
+'    }\n' +
+'\n' +
+'    const lines = el("div", "schedule-lines");\n' +
+'    [\n' +
+rowSrc + '\n' +
+'    ].forEach(([day, text]) => {\n' +
+'      const p = el("p");\n' +
+'      p.append(el("b", "", day), document.createTextNode(text));\n' +
+'      lines.append(p);\n' +
+'    });\n' +
+'    lines.append(el("p", "schedule-foot", ' + jsStr(foot) + '));\n' +
+'    sheet.append(lines);\n' +
+'    return sheet;\n' +
+'  }';
+  }
+
+  function buildCalendarFn(month) {
+    return '' +
+'  function makeCalendar() {\n' +
+'    const sheet = el("div", "calendar" + (state.assets.calendar ? " imported" : ""));\n' +
+'    if (state.assets.calendar) {\n' +
+'      const img = localImage(state.assets.calendar, "静态装饰月历，不代表当前月份");\n' +
+'      img.addEventListener("load", () => {\n' +
+'        sheet.style.aspectRatio = img.naturalWidth + " / " + img.naturalHeight;\n' +
+'      });\n' +
+'      sheet.append(img);\n' +
+'    } else {\n' +
+'      sheet.append(el("div", "calendar-title", ' + jsStr(month) + '));\n' +
+'      const grid = el("div", "calendar-grid");\n' +
+'      ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].forEach(day => {\n' +
+'        grid.append(el("span", "weekday", day));\n' +
+'      });\n' +
+'      for (let i = 0; i < 35; i++) {\n' +
+'        const day = i - 2;\n' +
+'        const mark = busyFree.busy.includes(day) ? " busy" : (busyFree.free.includes(day) ? " free" : "");\n' +
+'        grid.append(el("span", mark, day >= 1 && day <= 30 ? String(day) : ""));\n' +
+'      }\n' +
+'      sheet.append(grid);\n' +
+'      sheet.append(el("p", "calendar-legend", "【忙碌闲暇表】红＝忙碌 · 绿＝闲暇"));\n' +
+'    }\n' +
+'    return sheet;\n' +
+'  }';
+  }
+
+  const PHOTO_PLACEHOLDER_LINE = '      el("div", "polaroid-photo", "3:4 照片占位\\n图片待补充"),';
+  const PHOTO_HELPER =
+'  function makePolaroidPhoto() {\n' +
+'    const box = el("div", "polaroid-photo");\n' +
+'    if (polaroidData.photo) {\n' +
+'      const img = localImage(polaroidData.photo, polaroidData.name);\n' +
+'      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";\n' +
+'      box.append(img);\n' +
+'    } else {\n' +
+'      box.textContent = "3:4 照片占位\\n图片待补充";\n' +
+'    }\n' +
+'    return box;\n' +
+'  }\n';
+
+  function generate() {
+    if (!srcText || !data) throw new Error("请先导入 index.html");
+    let out = srcText;
+
+    // 1) board-data：便签 + 拍立得位置（保留原有坐标和素材）
+    const snapshot = {
+      version: 1,
+      assets: { schedule: data.assets.schedule || "", calendar: data.assets.calendar || "" },
+      canvasMinHeight: data.canvasMinHeight,
+      notes: data.notes.map(n => ({ id: n.id, text: n.text, color: n.color, u: n.u, v: n.v, z: n.z })),
+      polaroid: {
+        u: data.polaroidPos.u,
+        v: data.polaroidPos.v,
+        z: data.polaroidPos.z
+      }
+    };
+    const json = JSON.stringify(snapshot)
+      .replace(/</g, () => "\\u003c")
+      .replace(/\u2028/g, () => "\\u2028")
+      .replace(/\u2029/g, () => "\\u2029");
+    const bdRe = /<script type="application\/json" id="board-data">[\s\S]*?<\/script>/;
+    if (!bdRe.test(out)) throw new Error("找不到便签数据块");
+    out = out.replace(bdRe, () =>
+      '<script type="application/json" id="board-data">\n' + json + '\n<\/script>');
+
+    // 2) 忙碌闲暇表
+    const bfRe = /const busyFree = \{[^}]*\};/;
+    if (!bfRe.test(out)) throw new Error("找不到忙碌闲暇表");
+    out = out.replace(bfRe, () =>
+      "const busyFree = {\n    busy: [" + data.busy.join(", ") + "],\n    free: [" + data.free.join(", ") + "]\n  };");
+
+    // 3) 拍立得数据
+    const pdRe = /const polaroidData = \{[\s\S]*?\n  \};/;
+    if (!pdRe.test(out)) throw new Error("找不到拍立得数据");
+    const pdBody =
+      "    name: " + jsStr(data.pol.name) + ",\n" +
+      "    intro: " + jsStr(data.pol.intro) + ",\n" +
+      "    url: " + jsStr(data.pol.url) +
+      (data.pol.photo ? ",\n    photo: " + jsStr(data.pol.photo) : "") + "\n  ";
+    out = out.replace(pdRe, () => "const polaroidData = {\n" + pdBody + "};");
+
+    // 4) 本周日程函数（整体重写，仅内容变化）
+    const schRe = /  function makeSchedule\(\) \{[\s\S]*?\n  \}/;
+    if (!schRe.test(out)) throw new Error("找不到本周日程代码");
+    out = out.replace(schRe, () => buildScheduleFn(data.schedTitle, data.schedRows, data.schedFoot));
+
+    // 5) 月历函数（整体重写，仅标题变化）
+    const calRe = /  function makeCalendar\(\) \{[\s\S]*?\n  \}/;
+    if (!calRe.test(out)) throw new Error("找不到月历代码");
+    out = out.replace(calRe, () => buildCalendarFn(data.monthTitle));
+
+    // 6) 拍立得照片：首次添加时插入辅助函数并替换两处占位
+    if (data.pol.photo) {
+      const hasHelper = out.includes("function makePolaroidPhoto()");
+      if (!hasHelper) {
+        const anchor = /  function makePolaroidNode\(\) \{/;
+        if (!anchor.test(out)) throw new Error("找不到拍立得代码位置");
+        out = out.replace(anchor, () => PHOTO_HELPER + "  function makePolaroidNode() {");
+      }
+      if (out.includes(PHOTO_PLACEHOLDER_LINE)) {
+        out = out.split(PHOTO_PLACEHOLDER_LINE).join("      makePolaroidPhoto(),");
+      }
+      const calls = out.split("makePolaroidPhoto(),").length - 1;
+      if (calls < 2) throw new Error("拍立得照片代码替换不完整，请检查 index.html 是否被手工改过");
+    }
+
+    return out;
+  }
+
+  // ---------- 预览与导出 ----------
+  function doPreview() {
+    if (needFile()) return;
+    try {
+      $("previewFrame").srcdoc = generate();
+      toast("预览已生成");
+    } catch (err) {
+      alert("生成失败：" + err.message);
+    }
+  }
+  $("btnPreview").addEventListener("click", doPreview);
+  $("btnPreview2").addEventListener("click", doPreview);
+
+  $("btnExport").addEventListener("click", () => {
+    if (needFile()) return;
+    try {
+      const html = generate();
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "index.html";
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast("已下载新的 index.html，请用它覆盖旧文件（记得先备份旧文件）");
+    } catch (err) {
+      alert("导出失败：" + err.message);
+    }
+  });
+})();
+</script>
+</body>
+</html>
