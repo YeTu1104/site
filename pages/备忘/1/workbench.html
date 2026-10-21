@@ -358,21 +358,9 @@
 
     <section class="card" id="secPolaroid">
       <h2><span class="num">4</span>拍立得（照片 / 名字 / 介绍 / 网址）</h2>
-      <p class="tip">上传照片会自动压缩后内嵌进网页；名字显示在照片下方；介绍和网址显示在点开后的背面。</p>
-      <div class="pol-wrap">
-        <div>
-          <div class="pol-photo" id="polPhotoBox"><span>3:4 照片占位<br />图片待补充</span></div>
-          <div class="pol-btns">
-            <button id="btnPolUpload" class="mini">上传照片</button>
-            <button id="btnPolRemove" class="mini danger">移除照片</button>
-          </div>
-        </div>
-        <div class="pol-fields">
-          <label class="field"><span>名字（照片下方 & 背面标题）</span><input type="text" id="polName" /></label>
-          <label class="field"><span>介绍（背面文字，可换行）</span><textarea id="polIntro" rows="4"></textarea></label>
-          <label class="field"><span>网址链接（背面可点开的链接）</span><input type="text" id="polUrl" /></label>
-        </div>
-      </div>
+      <p class="tip">上传照片会自动压缩后内嵌进网页；名字显示在照片下方；介绍和网址显示在点开后的背面。点「新增拍立得」可加一张、点「✕」删除一张。</p>
+      <div id="polList"></div>
+      <button id="btnAddPol" class="mini">＋ 新增拍立得</button>
     </section>
 
     <section class="card" id="secPreview">
@@ -407,10 +395,10 @@
   let fileName = "";
   let data = null;
   // data = {
-  //   notes:[{id,text,color,u,v,z}], assets, canvasMinHeight, polaroidPos,
+  //   notes:[{id,text,color,u,v,z}], assets, canvasMinHeight, polaroids:[{u,v,z}],
   //   schedTitle, schedRows:[[day,text]], schedFoot,
   //   monthTitle, busy:[], free:[],
-  //   pol:{name,intro,url,photo?}
+  //   pols:[{name,intro,url,photo?}]
   // }
 
   const NOTE_COLORS = [
@@ -457,7 +445,9 @@
     d.notes = (board.notes || []).map(n => ({
       id: n.id, text: n.text, color: n.color, u: n.u, v: n.v, z: n.z
     }));
-    d.polaroidPos = board.polaroid || { u: 0.8, v: 0.55, z: 10 };
+    d.polaroids = Array.isArray(board.polaroids)
+      ? board.polaroids.map(p => ({ u: p.u, v: p.v, z: p.z }))
+      : (board.polaroid ? [{ u: board.polaroid.u, v: board.polaroid.v, z: board.polaroid.z }] : [{ u: 0.8, v: 0.55, z: 10 }]);
 
     // 2) 本周日程（整个 makeSchedule 函数）
     const sch = matchOne(text, /function makeSchedule\(\) \{[\s\S]*?\n  \}/, "本周日程")[0];
@@ -477,12 +467,17 @@
     d.free = bf[2].split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
 
     // 4) 拍立得
-    const pd = matchOne(text, /const polaroidData = \{([\s\S]*?)\n  \};/, "拍立得数据")[1];
-    const get = k => {
-      const m = pd.match(new RegExp(k + ":\\s*\"((?:[^\"\\\\]|\\\\.)*)\""));
-      return m ? unesc(m[1]) : undefined;
-    };
-    d.pol = { name: get("name"), intro: get("intro"), url: get("url"), photo: get("photo") };
+    const pd = matchOne(text, /const polaroidData = (\[[\s\S]*?\n  \}\]);/, "拍立得数据");
+    const pols = new Function("return " + pd[1])();
+    d.pols = pols.map(o => ({
+      name: o.name != null ? String(o.name) : "",
+      intro: o.intro != null ? String(o.intro) : "",
+      url: o.url != null ? String(o.url) : "",
+      photo: o.photo || undefined
+    }));
+    // 让位置数组与内容数组长度一致，避免增删/排序错位。
+    while (d.polaroids.length < d.pols.length) d.polaroids.push({ u: 0.8, v: 0.55, z: 10 });
+    if (d.polaroids.length > d.pols.length) d.polaroids.length = d.pols.length;
 
     return d;
   }
@@ -644,17 +639,70 @@
     data.busy = []; data.free = []; renderCal();
   });
 
+  let polEditIndex = 0;
   function renderPol() {
-    const box = $("polPhotoBox");
-    if (data.pol.photo) box.innerHTML = '<img src="' + data.pol.photo + '" alt="拍立得照片预览" />';
-    else box.innerHTML = "<span>3:4 照片占位<br />图片待补充</span>";
-    $("polName").value = data.pol.name;
-    $("polIntro").value = data.pol.intro;
-    $("polUrl").value = data.pol.url;
+    const box = $("polList");
+    box.innerHTML = "";
+    data.pols.forEach((pol, i) => {
+      const item = document.createElement("div");
+      item.className = "note-item";
+      const photoHtml = pol.photo
+        ? '<div class="pol-photo" style="width:120px;"><img src="' + pol.photo + '" alt="拍立得照片预览" /></div>'
+        : '<div class="pol-photo" style="width:120px;"><span>3:4 照片占位<br />图片待补充</span></div>';
+      item.innerHTML =
+        '<div class="note-head"><span class="nid">拍立得 ' + (i + 1) + '</span>' +
+        '<div class="ops">' +
+        '<button type="button" class="mini" data-act="up" title="上移">↑</button>' +
+        '<button type="button" class="mini" data-act="down" title="下移">↓</button>' +
+        '<button type="button" class="mini danger" data-act="del" title="删除">✕</button>' +
+        '</div></div>' +
+        '<div class="pol-wrap">' +
+        '<div>' + photoHtml +
+        '<div class="pol-btns">' +
+        '<button type="button" class="mini" data-act="upload">上传照片</button>' +
+        '<button type="button" class="mini danger" data-act="nophoto">移除照片</button>' +
+        '</div></div>' +
+        '<div class="pol-fields">' +
+        '<label class="field"><span>名字（照片下方 &amp; 背面标题）</span><input type="text" data-f="name" value="' + esc(pol.name) + '" /></label>' +
+        '<label class="field"><span>介绍（背面文字，可换行）</span><textarea data-f="intro" rows="3">' + esc(pol.intro) + '</textarea></label>' +
+        '<label class="field"><span>网址链接（背面可点开的链接）</span><input type="text" data-f="url" value="' + esc(pol.url) + '" /></label>' +
+        '</div></div>';
+
+      item.querySelector('[data-f="name"]').addEventListener("input", e => { pol.name = e.target.value; });
+      item.querySelector('[data-f="intro"]').addEventListener("input", e => { pol.intro = e.target.value; });
+      item.querySelector('[data-f="url"]').addEventListener("input", e => { pol.url = e.target.value; });
+      item.addEventListener("click", e => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        const act = b.dataset.act;
+        if (act === "upload") { polEditIndex = i; polFile.click(); }
+        else if (act === "nophoto") { pol.photo = undefined; renderPol(); toast("已移除该拍立得照片（导出后将显示占位文字）"); }
+        else if (act === "del") {
+          if (data.pols.length <= 1) { alert("至少保留一张拍立得"); return; }
+          data.pols.splice(i, 1);
+          data.polaroids.splice(i, 1);
+          renderPol();
+        }
+        else if (act === "up" && i > 0) {
+          data.pols.splice(i - 1, 0, data.pols.splice(i, 1)[0]);
+          data.polaroids.splice(i - 1, 0, data.polaroids.splice(i, 1)[0]);
+          renderPol();
+        }
+        else if (act === "down" && i < data.pols.length - 1) {
+          data.pols.splice(i + 1, 0, data.pols.splice(i, 1)[0]);
+          data.polaroids.splice(i + 1, 0, data.polaroids.splice(i, 1)[0]);
+          renderPol();
+        }
+      });
+      box.append(item);
+    });
   }
-  $("polName").addEventListener("input", e => { data.pol.name = e.target.value; });
-  $("polIntro").addEventListener("input", e => { data.pol.intro = e.target.value; });
-  $("polUrl").addEventListener("input", e => { data.pol.url = e.target.value; });
+  $("btnAddPol").addEventListener("click", () => {
+    if (needFile()) return;
+    data.pols.push({ name: "", intro: "", url: "", photo: undefined });
+    data.polaroids.push({ u: 0.8, v: 0.55, z: 10 });
+    renderPol();
+  });
 
   // 上传照片：压缩到最长边 1200 后转 dataURL
   const polFile = document.createElement("input");
@@ -662,13 +710,6 @@
   polFile.accept = "image/*";
   polFile.className = "hidden-input";
   document.body.append(polFile);
-  $("btnPolUpload").addEventListener("click", () => { if (!needFile()) polFile.click(); });
-  $("btnPolRemove").addEventListener("click", () => {
-    if (needFile()) return;
-    data.pol.photo = undefined;
-    renderPol();
-    toast("已移除照片（导出后将显示占位文字）");
-  });
   polFile.addEventListener("change", e => {
     const f = e.target.files[0];
     e.target.value = "";
@@ -687,7 +728,7 @@
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
-        data.pol.photo = cv.toDataURL("image/jpeg", 0.85);
+        data.pols[polEditIndex].photo = cv.toDataURL("image/jpeg", 0.85);
         renderPol();
         toast("照片已载入（已自动压缩）。点击导出后会嵌入网页。");
       };
@@ -758,20 +799,6 @@ rowSrc + '\n' +
 '  }';
   }
 
-  const PHOTO_PLACEHOLDER_LINE = '      el("div", "polaroid-photo", "3:4 照片占位\\n图片待补充"),';
-  const PHOTO_HELPER =
-'  function makePolaroidPhoto() {\n' +
-'    const box = el("div", "polaroid-photo");\n' +
-'    if (polaroidData.photo) {\n' +
-'      const img = localImage(polaroidData.photo, polaroidData.name);\n' +
-'      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";\n' +
-'      box.append(img);\n' +
-'    } else {\n' +
-'      box.textContent = "3:4 照片占位\\n图片待补充";\n' +
-'    }\n' +
-'    return box;\n' +
-'  }\n';
-
   function generate() {
     if (!srcText || !data) throw new Error("请先导入 index.html");
     let out = srcText;
@@ -782,11 +809,7 @@ rowSrc + '\n' +
       assets: { schedule: data.assets.schedule || "", calendar: data.assets.calendar || "" },
       canvasMinHeight: data.canvasMinHeight,
       notes: data.notes.map(n => ({ id: n.id, text: n.text, color: n.color, u: n.u, v: n.v, z: n.z })),
-      polaroid: {
-        u: data.polaroidPos.u,
-        v: data.polaroidPos.v,
-        z: data.polaroidPos.z
-      }
+      polaroids: data.polaroids.map(p => ({ u: p.u, v: p.v, z: p.z }))
     };
     const json = JSON.stringify(snapshot)
       .replace(/</g, () => "\\u003c")
@@ -803,15 +826,21 @@ rowSrc + '\n' +
     out = out.replace(bfRe, () =>
       "const busyFree = {\n    busy: [" + data.busy.join(", ") + "],\n    free: [" + data.free.join(", ") + "]\n  };");
 
-    // 3) 拍立得数据
-    const pdRe = /const polaroidData = \{[\s\S]*?\n  \};/;
+    // 3) 拍立得数据（数组，与 board-data 的 polaroids 位置一一对应）
+    const pdRe = /const polaroidData = \[[\s\S]*?\n  \}\];/;
     if (!pdRe.test(out)) throw new Error("找不到拍立得数据");
-    const pdBody =
-      "    name: " + jsStr(data.pol.name) + ",\n" +
-      "    intro: " + jsStr(data.pol.intro) + ",\n" +
-      "    url: " + jsStr(data.pol.url) +
-      (data.pol.photo ? ",\n    photo: " + jsStr(data.pol.photo) : "") + "\n  ";
-    out = out.replace(pdRe, () => "const polaroidData = {\n" + pdBody + "};");
+    let pdLiteral = "const polaroidData = [";
+    data.pols.forEach((pol, i) => {
+      const lines = [
+        "    name: " + jsStr(pol.name),
+        "    intro: " + jsStr(pol.intro),
+        "    url: " + jsStr(pol.url)
+      ];
+      if (pol.photo) lines.push("    photo: " + jsStr(pol.photo));
+      pdLiteral += (i === 0 ? "{\n" : ",\n  {\n") + lines.join(",\n") + "\n  }";
+    });
+    pdLiteral += "];";
+    out = out.replace(pdRe, () => pdLiteral);
 
     // 4) 本周日程函数（整体重写，仅内容变化）
     const schRe = /  function makeSchedule\(\) \{[\s\S]*?\n  \}/;
@@ -822,21 +851,6 @@ rowSrc + '\n' +
     const calRe = /  function makeCalendar\(\) \{[\s\S]*?\n  \}/;
     if (!calRe.test(out)) throw new Error("找不到月历代码");
     out = out.replace(calRe, () => buildCalendarFn(data.monthTitle));
-
-    // 6) 拍立得照片：首次添加时插入辅助函数并替换两处占位
-    if (data.pol.photo) {
-      const hasHelper = out.includes("function makePolaroidPhoto()");
-      if (!hasHelper) {
-        const anchor = /  function makePolaroidNode\(\) \{/;
-        if (!anchor.test(out)) throw new Error("找不到拍立得代码位置");
-        out = out.replace(anchor, () => PHOTO_HELPER + "  function makePolaroidNode() {");
-      }
-      if (out.includes(PHOTO_PLACEHOLDER_LINE)) {
-        out = out.split(PHOTO_PLACEHOLDER_LINE).join("      makePolaroidPhoto(),");
-      }
-      const calls = out.split("makePolaroidPhoto(),").length - 1;
-      if (calls < 2) throw new Error("拍立得照片代码替换不完整，请检查 index.html 是否被手工改过");
-    }
 
     return out;
   }
