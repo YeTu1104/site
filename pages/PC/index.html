@@ -69,6 +69,10 @@
     display: block;
     transition: transform 0.12s ease, filter 0.12s ease;
   }
+  /* 左上角固定放语言切换条，桌面图标整体下移一点，别被挡住 */
+  @media (min-width: 901px) and (min-aspect-ratio: 1/1) {
+    #stage .icon { margin-top: 46px; }
+  }
   .icon .lbl {
     color: #fff;
     font-size: 14px;
@@ -175,6 +179,122 @@
     display: none;
     width: 100%;
   }
+
+  /* =========================================================
+     响应式：手机 / 平板竖屏
+     - 桌面端仍然是 1376×768 设计画布整体缩放（视觉完全不变）
+     - 小屏改成“手机桌面”式布局：图标排成网格、窗口铺满屏幕，
+       避免整页缩小后图标小到点不中
+     ========================================================= */
+  @media (max-width: 900px), (max-aspect-ratio: 1/1) {
+    #stage {
+      position: fixed;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      transform: none !important;
+      background-size: cover;
+      background-position: center bottom;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      justify-items: center;
+      align-content: center;
+      gap: 14px 6px;
+      padding: 24px 10px 96px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    /* 手机上没有鼠标悬停，关掉悬停放大，保留按下反馈 */
+    @media (hover: none) {
+      .icon:hover img { filter: none; transform: none; }
+      #btnBack:hover { background: #4A4A6A; }
+    }
+
+    #trail { display: none; }
+
+    .icon {
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      width: 100%;
+      max-width: 132px;
+    }
+    .icon img {
+      width: 72px;
+      height: 72px;
+    }
+    .icon .lbl {
+      font-size: 15px;
+    }
+
+    /* 平板这种更宽的屏，图标也跟着放大一点 */
+    @media (min-width: 600px) {
+      .icon { max-width: 168px; }
+      .icon img { width: 88px; height: 88px; }
+      .icon .lbl { font-size: 17px; }
+    }
+
+    /* 横屏手机：一排放下 6 个图标，别落单 */
+    @media (orientation: landscape) {
+      #stage {
+        grid-template-columns: repeat(6, 1fr);
+      }
+      .icon {
+        max-width: 122px;
+      }
+      .icon img {
+        width: 64px;
+        height: 64px;
+      }
+      .icon .lbl {
+        font-size: 13px;
+      }
+    }
+
+    #btnBack {
+      position: fixed;
+      left: 10px;
+      top: auto;
+      bottom: 12px;
+      width: auto;
+      min-width: 150px;
+      max-width: calc(100vw - 190px);
+      padding: 0 12px;
+      height: 52px;
+      font-size: 15px;
+      line-height: 48px;
+      white-space: nowrap;
+      z-index: 120;
+    }
+
+    /* 弹窗：铺满屏幕，内部 iframe 自己负责各自的移动端布局 */
+    #win {
+      position: fixed !important;
+      left: 6px !important;
+      top: 52px !important;
+      right: 6px !important;
+      bottom: 6px !important;
+      width: auto !important;
+      height: auto !important;
+      z-index: 200;
+    }
+    #winTitle {
+      height: 44px;
+      font-size: 17px;
+      padding: 0 8px 0 14px;
+      cursor: default;
+    }
+    #winClose {
+      width: 34px;
+      height: 34px;
+      line-height: 34px;
+      font-size: 20px;
+    }
+    #winFrame { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -221,6 +341,9 @@
     <button id="btnBack" type="button">返回房间</button>
   </div>
 
+<!-- 多语言：中文 / English / 日本語（现成翻译插件 translate.js，配置在同目录上方的 i18n.js 里） -->
+<script src="../../ceshi/6/i18n.js" data-lang-pos="tl"></script>
+
 <script>
 (function () {
   "use strict";
@@ -231,13 +354,29 @@
   var stage = document.getElementById("stage");
   var scale = 1;
 
+  /* 小屏（手机 / 平板竖屏）：改用「手机桌面」布局，不再整体缩放
+     —— 断点与上面 CSS 里的媒体查询保持一致 */
+  var COMPACT = window.matchMedia("(max-width: 900px), (max-aspect-ratio: 1/1)");
+  function isCompact() { return COMPACT.matches; }
+
   function fit() {
+    if (isCompact()) {
+      stage.style.transform = "";
+      stage.style.left = "";
+      stage.style.top = "";
+      return;
+    }
     scale = Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
     stage.style.transform = "scale(" + scale + ")";
     stage.style.left = ((window.innerWidth - DESIGN_W * scale) / 2) + "px";
     stage.style.top = ((window.innerHeight - DESIGN_H * scale) / 2) + "px";
   }
   window.addEventListener("resize", fit);
+  if (COMPACT.addEventListener) {
+    COMPACT.addEventListener("change", fit);
+  } else if (COMPACT.addListener) {
+    COMPACT.addListener(fit);
+  }
   fit();
 
   /* ========== 2. 窗口与内容 ========== */
@@ -275,16 +414,19 @@
 
     win.style.display = "flex";
 
-    // 紧贴图标右侧弹出（设计坐标系）
-    var left = iconEl.offsetLeft + iconEl.offsetWidth + 12;
-    var top = iconEl.offsetTop;
-    var w = win.offsetWidth;
-    var h = win.offsetHeight;
-    left = Math.max(8, Math.min(DESIGN_W - w - 8, left));
-    top = Math.max(8, Math.min(DESIGN_H - h - 8, top));
-    win.style.left = left + "px";
-    win.style.top = top + "px";
-    win.style.zIndex = 20;
+    // 小屏：窗口由 CSS 铺满屏幕，不再贴着图标定位
+    if (!isCompact()) {
+      // 紧贴图标右侧弹出（设计坐标系）
+      var left = iconEl.offsetLeft + iconEl.offsetWidth + 12;
+      var top = iconEl.offsetTop;
+      var w = win.offsetWidth;
+      var h = win.offsetHeight;
+      left = Math.max(8, Math.min(DESIGN_W - w - 8, left));
+      top = Math.max(8, Math.min(DESIGN_H - h - 8, top));
+      win.style.left = left + "px";
+      win.style.top = top + "px";
+    }
+    win.style.zIndex = isCompact() ? 200 : 20;
 
     // 重启动画，弹出时有缩放回弹的效果
     win.classList.remove("open");
@@ -311,6 +453,7 @@
   var startX = 0, startY = 0, startLeft = 0, startTop = 0;
 
   titleBar.addEventListener("pointerdown", function (e) {
+    if (isCompact()) { return; } // 小屏窗口铺满屏幕，不需要拖动
     dragging = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -401,6 +544,7 @@
   }
 
   window.addEventListener("pointermove", function (e) {
+    if (isCompact()) { return; } // 小屏是触屏，没有鼠标拖尾
     var rect = stage.getBoundingClientRect();
     var x = (e.clientX - rect.left) / scale;
     var y = (e.clientY - rect.top) / scale;

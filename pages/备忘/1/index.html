@@ -2,9 +2,10 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
+
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src 'self' data: file:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';" />
+      content="default-src 'none'; img-src 'self' data: file: https:; script-src 'self' file: 'unsafe-inline' https://res.zvo.cn https://cdn.staticfile.net; style-src 'unsafe-inline' 'self' https:; connect-src 'self' https://*.zvo.cn https://edge.microsoft.com https://cdn.staticfile.net; frame-src 'self'; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none';" />
 <title>叶荼的备忘板</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <style>
@@ -610,6 +611,140 @@ textarea {
   .board { padding: 34px; gap: 19px; }
   .sidebar { padding-left: 0; padding-right: 0; }
 }
+
+/* =========================================================
+   响应式：手机 / 竖向窗口
+   桌面端仍是木框公告栏的固定版式（视觉不变）；
+   小屏改成：顶部两张小卡片（点开看大图）+ 下方便签画布。
+   断点：宽度 ≤900 或竖向窗口
+   ========================================================= */
+@media (max-width: 900px), (max-aspect-ratio: 1/1) {
+  body {
+    background-size: cover;
+    background-position: center;
+  }
+
+  .page {
+    min-width: 0;
+    height: 100vh;
+    height: 100dvh;
+    padding: 6px;
+  }
+  .board {
+    position: static;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 6px 4px;
+    overflow: hidden;
+  }
+  .sidebar {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 10px;
+    padding: 0;
+    flex: 0 0 auto;
+  }
+  .info-slot {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .schedule { width: min(44vw, 190px); }
+  .schedule-title {
+    font-size: 15px;
+    letter-spacing: 1px;
+    padding-bottom: 4px;
+    border-bottom-width: 2px;
+  }
+  .schedule-lines {
+    top: 22%;
+    font-size: 10px;
+    gap: 7px;
+    line-height: 1.6;
+  }
+
+  .calendar {
+    width: min(46vw, 196px);
+    padding: 6px;
+    border-width: 3px;
+    outline-width: 1px;
+  }
+  .calendar-title {
+    font-size: 13px;
+    margin-bottom: 4px;
+    padding-bottom: 3px;
+    border-bottom-width: 2px;
+  }
+  .calendar-grid {
+    grid-template-rows: 14px repeat(5, 1fr);
+    gap: 1px;
+  }
+  .calendar-grid span { font-size: 10px; }
+  .calendar-grid .weekday { font-size: 6px; }
+  .calendar-legend { font-size: 7px; padding-top: 3px; }
+
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    display: block;
+  }
+  .canvas {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .note-text { font-size: 15px; }
+
+  dialog {
+    width: min(680px, 96vw);
+    max-height: 92dvh;
+  }
+  .dialog-body { padding: 18px; }
+}
+
+/* 横屏手机：屏幕矮，改成左右分栏（左边两张小卡、右边便签画布） */
+@media (max-width: 900px) and (orientation: landscape) {
+  .board {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+    padding: 2px;
+  }
+  .sidebar {
+    flex-direction: column;
+    align-items: center;
+    width: 140px;
+    flex: 0 0 140px;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .info-slot { width: 100%; }
+  .schedule { width: min(100%, 124px); }
+  .calendar { width: min(100%, 124px); }
+
+  .schedule-title {
+    font-size: 13px;
+    letter-spacing: .5px;
+    padding-bottom: 3px;
+    border-bottom-width: 2px;
+  }
+  .schedule-lines {
+    font-size: 9px;
+    gap: 5px;
+    line-height: 1.5;
+  }
+  .calendar-title { font-size: 12px; margin-bottom: 3px; padding-bottom: 2px; }
+  .calendar-grid { grid-template-rows: 12px repeat(5, 1fr); }
+  .calendar-grid span { font-size: 9px; }
+  .calendar-grid .weekday { font-size: 5px; }
+  .calendar-legend { font-size: 6.5px; }
+
+  .workspace { flex: 1; min-width: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
@@ -648,6 +783,33 @@ textarea {
   outline: 3px solid #164f62;
   outline-offset: 5px;
 }
+/* 小屏上手按的返回按钮缩小，别挡住板子上的内容 */
+@media (max-width: 900px), (max-aspect-ratio: 1/1) {
+  /* 左上角固定了语言切换条，整块板子往下让一点 */
+  .page { padding: 50px 6px 6px; }
+  .polaroid-caption { font-size: 13px; line-height: 1.25; overflow: hidden; }
+  .back-btn {
+    left: 8px;
+    bottom: 8px;
+    width: auto;
+    min-width: 118px;
+    height: 54px;
+    padding: 0 22px 0 30px;
+    font-size: 17px;
+    letter-spacing: 4px;
+  }
+}
+@media (max-width: 900px) and (orientation: landscape) {
+  .page { padding: 46px 6px 6px; }
+  .back-btn {
+    width: auto;
+    min-width: 96px;
+    height: 40px;
+    padding: 0 16px 0 22px;
+    font-size: 14px;
+    letter-spacing: 2px;
+  }
+}
 </style>
 </head>
 <body>
@@ -669,6 +831,9 @@ textarea {
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <a class="back-btn" href="../../../index.html" target="_top" title="返回上一页">返回</a>
+
+<!-- 多语言：中文 / English / 日本語（现成翻译插件 translate.js，配置在站点根目录的 i18n.js 里） -->
+<script src="../../../ceshi/6/i18n.js" data-lang-pos="tl"></script>
 
 <script type="application/json" id="board-data">
 {"version":1,"assets":{"schedule":"","calendar":""},"canvasMinHeight":240,"notes":[{"id":"seed1","text":"目前暂无工作","color":"pink","u":null,"v":null,"z":1}],"polaroids":[{"u":0.8,"v":0.55,"z":10},{"u":0.52,"v":0.6,"z":10}]}
@@ -942,7 +1107,7 @@ textarea {
       const col = index % cols;
       const row = Math.floor(index / cols);
       n.u = cols === 1 ? .5 : col / (cols - 1);
-      n.v = rows === 1 ? .45 : row / (rows - 1);
+      n.v = rows === 1 ? (d.cw < 560 ? 0 : .45) : row / (rows - 1);
       // 轻微错落，保留足够行列间距。
       if (n.u > 0 && n.u < 1) n.u = clamp(n.u + (index % 2 ? .012 : -.012), 0, 1);
       if (n.v > 0 && n.v < 1) n.v = clamp(n.v + (index % 2 ? .014 : -.014), 0, 1);
@@ -978,7 +1143,7 @@ textarea {
     });
     state.polaroids.forEach((p, index) => {
       const view = polaroidViews[index];
-      if (view) positionPolaroid(p, view, d);
+      if (view) positionPolaroid(p, view, d, index);
     });
   }
 
@@ -1122,11 +1287,17 @@ textarea {
   let polaroidFlipTimer = 0;
   let polaroidCloseTimer = 0;
 
-  function positionPolaroid(p, view, d) {
+  function positionPolaroid(p, view, d, index) {
     p.u = clamp(Number.isFinite(p.u) ? p.u : .5, 0, 1);
     p.v = clamp(Number.isFinite(p.v) ? p.v : .5, 0, 1);
-    view.x = d.pad + p.u * d.pSpanX;
-    view.y = d.pad + p.v * d.pSpanY;
+    let u = p.u, v = p.v;
+    // 手机窄画布：两张拍立得改到右侧一列，避免缩在同一点上叠成一坨
+    if (d.cw < 560) {
+      u = 1;
+      v = index % 2 ? 0.72 : 0.08;
+    }
+    view.x = d.pad + u * d.pSpanX;
+    view.y = d.pad + v * d.pSpanY;
     view.node.style.width = d.pWidth + "px";
     view.node.style.height = d.pHeight + "px";
     view.node.style.left = view.x + "px";
@@ -1718,6 +1889,9 @@ textarea {
   applyAssets();
   renderNotes();
   mountPolaroid();
+
+  /* 便签和拍立得的文字是脚本生成的，让翻译插件再翻一遍 */
+  if (window.i18n && window.i18n.refresh) { window.i18n.refresh(); }
 
   if (typeof ResizeObserver !== "undefined") {
     const observer = new ResizeObserver(queueLayout);

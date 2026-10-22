@@ -216,6 +216,56 @@
     border-radius: 50%;
   }
   #pixelIntro #pwdots .d.on { background: #ffd166; }
+
+  /* =========================================================
+     响应式：手机 / 竖向小窗口
+     桌面端仍是 1176×870 的等比画布（视觉不变）；
+     小屏改成整屏铺满的文件夹网格（自适应 1~3 列）＋触摸滑动。
+     断点：宽度 ≤640 或竖向窗口（1040×624、800×480 等桌面 iframe 不命中）
+     ========================================================= */
+  @media (max-width: 640px), (max-aspect-ratio: 1/1) {
+    #pixelIntro {
+      align-items: stretch;
+      overflow: hidden;
+    }
+    #pixelIntro #win {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      aspect-ratio: auto;
+    }
+    #pixelIntro #pvw {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    #pixelIntro #pvc {
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      column-gap: 12px;
+      row-gap: 12px;
+      padding: 12px 12px 26px;
+    }
+    /* 触屏没有 hover，按下时给一点按压缩放反馈 */
+    #pixelIntro .pw-folder:active {
+      transform: scale(0.97);
+      filter: brightness(1.04);
+    }
+
+    /* 弹窗：纸张放到几乎满宽，箭头和圆点挪到下方，避免超出屏幕 */
+    #pixelIntro #pwm { height: 100dvh; }
+    #pixelIntro .pw-arrow {
+      top: auto;
+      bottom: -46px;
+      transform: none;
+      padding: 8px;
+    }
+    #pixelIntro .pw-prev { left: 50%; margin-left: -72px; }
+    #pixelIntro .pw-next { right: 50%; margin-right: -72px; }
+    #pixelIntro .pw-arrow svg { width: 18px; height: 32px; }
+    #pixelIntro #pwdots { top: auto; bottom: -38px; }
+  }
 </style>
 </head>
 <body>
@@ -237,6 +287,7 @@
   </div>
 </div>
 
+<script src="../../../ceshi/6/i18n.js" data-lang-pos="tl"></script>
 <script src="窗口配置.js"></script>
 <script>
 (function () {
@@ -332,17 +383,60 @@
       })(FOLDERS[i]);
     }
     layoutText();
+
+    /* 文件夹名字是脚本生成的，让翻译插件再翻一遍 */
+    if (window.i18n && window.i18n.refresh) { window.i18n.refresh(); }
   }
 
   function layoutText() {
     var els = content.querySelectorAll('.pw-folder');
+    /* 英文 / 日文名字比中文长，缩小一点字号，避免被 overflow:hidden 裁掉 */
+    var factor = (window.i18n && window.i18n.lang() !== 'zh') ? 0.66 : 1;
     for (var i = 0; i < els.length; i++) {
       var f = FOLDERS[i];
       if (!f) { continue; }
       var fw = els[i].clientWidth;
-      els[i].querySelector('.pw-name').style.fontSize = ((f.nameSize || 18) / 507 * fw) + 'px';
+      var nameEl = els[i].querySelector('.pw-name');
+      var fs = (f.nameSize || 18) / 507 * fw * factor;
+      nameEl.style.fontSize = fs + 'px';
+
+      /* 特别长的名字（英文/日文）继续缩，直到塞得下为止。
+         .pw-name 是 overflow 可见的绝对定位盒子，scrollWidth 量不出溢出，
+         所以用 Range 量真实文字宽度。 */
+      var guard = 0;
+      /* 文件夹贴图本身左右有留白，文字要塞进贴图的可见部分才好看 */
+      var fitW = Math.min(nameEl.clientWidth, fw * 0.62);
+      while (fs > 8 && guard < 40) {
+        var textW = 0;
+        try {
+          var range = document.createRange();
+          range.selectNodeContents(nameEl);
+          textW = range.getBoundingClientRect().width;
+        } catch (e) {
+          textW = nameEl.scrollWidth;
+        }
+        if (textW <= fitW || !textW) { break; }
+        fs *= 0.92;
+        nameEl.style.fontSize = fs + 'px';
+        guard++;
+      }
     }
     updateScroll();
+  }
+
+  /* 翻译插件把名字换成英文/日文之后文字会变长，重新排一次 */
+  if (typeof MutationObserver !== 'undefined') {
+    var nameTimer = 0;
+    var nameObserver = new MutationObserver(function () {
+      clearTimeout(nameTimer);
+      nameTimer = setTimeout(layoutText, 120);
+    });
+    nameObserver.observe(content, { childList: true, subtree: true, characterData: true });
+  }
+
+  /* 切换语言后重新排一下文件夹名字的字号 */
+  if (window.i18n && window.i18n.onChange) {
+    window.i18n.onChange(function () { setTimeout(layoutText, 60); });
   }
 
   /* ---------- 滚动逻辑（自定义滑动条 + 滚轮 + 按钮） ---------- */
@@ -364,6 +458,23 @@
     scrollBy(e.deltaY);
   }, { passive: false });
 
+  /* 触屏：在文件夹区域上下滑动滚动（桌面端鼠标滚轮逻辑不变） */
+  var touchY = null, touchScroll = 0;
+  viewport.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'touch') { return; }
+    touchY = e.clientY;
+    touchScroll = scrollY;
+    if (viewport.setPointerCapture) { viewport.setPointerCapture(e.pointerId); }
+  });
+  viewport.addEventListener('pointermove', function (e) {
+    if (touchY === null) { return; }
+    scrollY = Math.max(0, Math.min(maxScroll, touchScroll - (e.clientY - touchY)));
+    updateScroll();
+  });
+  function endTouchScroll() { touchY = null; }
+  viewport.addEventListener('pointerup', endTouchScroll);
+  viewport.addEventListener('pointercancel', endTouchScroll);
+
   /* ---------- 打开文件夹 → 中央弹窗 ---------- */
   function openFolder(f, el) {
     for (var i = 0; i < FOLDERS.length; i++) { if (FOLDERS[i] === f) { curFolder = i; break; } }
@@ -377,8 +488,9 @@
   }
 
   function sizeModal() {
-    var maxH = window.innerHeight * 0.74;
-    var maxW = window.innerWidth * 0.74;
+    var compact = window.matchMedia("(max-width: 640px), (max-aspect-ratio: 1/1)").matches;
+    var maxH = window.innerHeight * (compact ? 0.70 : 0.74);
+    var maxW = window.innerWidth * (compact ? 0.94 : 0.74);
     var h = maxH;
     var w = h * (PAPER_W / PAPER_H);
     if (w > maxW) { w = maxW; h = w * (PAPER_H / PAPER_W); }

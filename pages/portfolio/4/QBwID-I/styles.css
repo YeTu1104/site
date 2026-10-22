@@ -361,3 +361,148 @@ body {
   outline: 2px dashed #EF4444 !important;
   background-color: rgba(239, 68, 68, 0.15) !important;
 }
+
+/* =========================================================
+   响应式：手机 / 竖向窗口
+   桌面端仍是 16:9 等比画布（视觉不变）；
+   小屏改成整屏铺满：顶部分类条 + 作品网格 + 底部留白条。
+   断点：宽度 ≤900 或竖向窗口（平板横屏仍走 16:9 桌面版）
+   ========================================================= */
+@media (max-width: 900px), (max-aspect-ratio: 1/1) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  .app-viewport {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: auto !important;
+    transform: none !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    box-shadow: none;
+  }
+
+  #bg-image { object-fit: cover; }
+
+  /* 分类按钮：顶部一排等分（下面留出左上角语言切换条的位置） */
+  .category-nav {
+    left: 4px !important;
+    right: 56px !important;
+    top: 50px !important;
+    bottom: auto !important;
+    width: auto !important;
+    height: 52px !important;
+    display: flex;
+    gap: 4px;
+  }
+  .category-btn {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    flex: 1 1 0;
+    width: auto !important;
+    height: 100% !important;
+    background-size: contain !important;
+    background-position: center !important;
+  }
+  .category-btn:hover:not(.active) { transform: scale(1.03); }
+  .category-btn.active { transform: scale(1.05); }
+
+  /* 回首页的 X */
+  .home-btn {
+    right: 4px !important;
+    top: 54px !important;
+    width: 46px !important;
+    height: 41px !important;
+  }
+
+  /* 作品区铺满剩余空间 */
+  #canvas-viewport {
+    left: 4px !important;
+    right: 4px !important;
+    top: 108px !important;
+    bottom: 44px !important;
+    width: auto !important;
+    height: auto !important;
+  }
+  #works-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    padding: 6px !important;
+  }
+  #empty-state span { font-size: 13px; }
+
+  /* 手机上用手指直接滑动，隐藏自定义滚动条 */
+  #custom-scrollbar { display: none !important; }
+
+  /* 彩蛋画框：挪到底部留白条里，不挡作品 */
+  .secret-frame {
+    left: auto !important;
+    top: auto !important;
+    right: 6px !important;
+    bottom: 8px !important;
+    width: 36% !important;
+    height: 28px !important;
+  }
+
+  /* 灯箱 */
+  #lightbox-inner img {
+    max-width: 92vw !important;
+    max-height: 74vh !important;
+  }
+  #lightbox-inner video {
+    width: min(92vw, calc(74vh * 16 / 9)) !important;
+    max-height: 74vh !important;
+  }
+  .pixel-note {
+    right: 3% !important;
+    bottom: 3% !important;
+    width: min(300px, 74vw) !important;
+  }
+  .pixel-note-text {
+    font-size: clamp(16px, 6.2vw, 26px) !important;
+    line-height: 1.4 !important;
+  }
+}
+
+/* 手机横屏：屏幕矮，分类条改回左侧竖排（图标才认得清），右边作品 3 列 */
+@media (max-width: 900px) and (orientation: landscape) {
+  .category-nav {
+    left: 4px !important;
+    right: auto !important;
+    top: 52px !important;
+    bottom: 4px !important;
+    width: 54px !important;
+    height: auto !important;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+  }
+  .category-btn {
+    flex: 0 0 auto;
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 160 / 145;
+  }
+  .home-btn {
+    top: 54px !important;
+    width: 40px !important;
+    height: 36px !important;
+  }
+  #canvas-viewport {
+    left: 64px !important;
+    right: 10px !important;
+    top: 52px !important;
+    bottom: 38px !important;
+  }
+  #works-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .secret-frame {
+    width: 30% !important;
+    height: 22px !important;
+  }
+}

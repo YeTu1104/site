@@ -151,6 +151,138 @@
   }
   #upBtn { left: 1749px; top: 77px; }
   #dnBtn { left: 1749px; top: 951px; }
+
+  /* =========================================================
+     响应式：手机 / 小窗口
+     桌面端仍是 1903×1080 设计画布整体缩放（视觉不变）；
+     小屏改成“上半身 + 白板”的排布，文字放大到可读字号。
+     断点：宽度 ≤600、高度 ≤420 或竖向窗口
+     （800×480 的桌面 iframe 不命中，桌面端完全不受影响）
+     ========================================================= */
+  @media (max-width: 600px), (max-height: 420px), (max-aspect-ratio: 1/1) {
+    html, body {
+      overflow: hidden;
+      background: #F5E6D3;
+      touch-action: manipulation;
+    }
+
+    #stage {
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      transform: none !important;
+      background: #F5E6D3 url('picture/背景.png') center top / cover no-repeat;
+      overflow: hidden;
+    }
+
+    /* 白板：沿用同一块白板纸的配色（白底 + 木色描边 + 硬阴影） */
+    #textArea {
+      background: #fdf8ec;
+      border: 3px solid #cfae93;
+      box-shadow: inset 0 0 0 3px #fffdf6, 4px 5px 0 rgba(94, 48, 29, 0.18);
+      box-sizing: border-box;
+    }
+    #textContent {
+      color: #4b3a5a;
+      font-size: clamp(15px, 4.3vw, 19px);
+      line-height: 1.75;
+      padding: 14px 16px;
+    }
+
+    .scroll-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 46px;
+      height: 46px;
+    }
+    .scroll-btn img { width: 34px; }
+
+    /* ---- 横屏 / 宽扁窗口：左边人物与滑块，右边白板 ---- */
+    #character {
+      position: absolute;
+      left: 6px;
+      top: 8px;
+      width: min(20vw, 108px);
+    }
+    #helloBtn {
+      position: absolute;
+      left: 8px;
+      top: auto;
+      bottom: 14px;
+      width: min(26vw, 140px);
+    }
+    .slider {
+      position: absolute;
+      top: 60%;
+      height: 40%;
+      width: 22px;
+    }
+    .slider:nth-of-type(1) { left: 156px !important; }
+    .slider:nth-of-type(2) { left: 204px !important; }
+    .slider:nth-of-type(3) { left: 252px !important; }
+    .track { width: 22px; height: 100%; }
+    .s-icon {
+      width: 44px !important;
+      top: -30px !important;
+      height: auto !important;
+    }
+
+    #textArea {
+      position: absolute;
+      left: 48%;
+      top: 8px;
+      right: 56px;
+      width: auto;
+      height: auto;
+      bottom: 46px;
+      touch-action: none;
+    }
+    #upBtn { left: auto; right: 4px; top: 8px; }
+    #dnBtn { left: auto; right: 4px; top: auto; bottom: 46px; }
+
+    /* ---- 竖屏（手机竖着看 / 竖窗口）：人物在上，白板占满下半屏 ---- */
+    @media (orientation: portrait) {
+      #character {
+        left: 4px;
+        top: 8px;
+        width: min(36vw, 168px);
+      }
+      #helloBtn {
+        left: auto;
+        right: 12px;
+        top: 24px;
+        bottom: auto;
+        width: min(48vw, 210px);
+      }
+      .slider {
+        top: 86px;
+        height: 104px;
+        width: 22px;
+      }
+      .slider:nth-of-type(1) { left: auto !important; right: 12px; }
+      .slider:nth-of-type(2) { left: auto !important; right: 64px; }
+      .slider:nth-of-type(3) { left: auto !important; right: 116px; }
+      .s-icon {
+        width: 44px !important;
+        top: -30px !important;
+      }
+
+      #textArea {
+        left: 8px;
+        right: 54px;
+        top: 214px;
+        bottom: 46px;
+        width: auto;
+        height: auto;
+      }
+      #upBtn { left: auto; right: 4px; top: 214px; }
+      #dnBtn { left: auto; right: 4px; top: auto; bottom: 46px; }
+    }
+  }
 </style>
 </head>
 <body>
@@ -190,6 +322,9 @@
       <img src="UI/下.png" alt="向下">
     </button>
   </div>
+
+<!-- 多语言：中文 / English / 日本語（现成翻译插件 translate.js；本页关掉自动监听，打字结束后再翻） -->
+<script src="../../../ceshi/6/i18n.js" data-lang-pos="tl" data-lang-listen="off"></script>
 
 <script>
 (function () {
@@ -249,6 +384,11 @@
     "如果想要联系我可以通过我的邮箱yesitubai1104@gmail.com，或者我的社交平台！"
   ].join("\n");
 
+  /* 切换语言后重新打开这个小窗口，保证整段文字是同一种语言（打字机中途切换会中英混排） */
+  if (window.i18n && window.i18n.onChange) {
+    window.i18n.onChange(function () { location.reload(); });
+  }
+
   var typed = false;   // 文字是否已全部出现
   var started = false; // 是否已经开始过打字
   var typing = false;
@@ -292,6 +432,11 @@
         scrollTo(maxScroll());
         // 文字全部出现后，直接切换回待机
         setChar("idle");
+        // 文字全部出现后再交给翻译插件（打字中途不翻，避免逐字乱翻）
+        if (window.i18n && window.i18n.refresh) {
+          window.i18n.refresh();
+          setTimeout(function () { scrollTo(maxScroll()); }, 900);
+        }
         return;
       }
       pos++;
@@ -324,6 +469,23 @@
     e.preventDefault();
     scrollTo(scrollPos + e.deltaY);
   }, { passive: false });
+
+  // 触屏：在白板上上下滑动阅读（桌面端鼠标不受影响）
+  var touchDrag = false, touchStartY = 0, touchStartScroll = 0;
+  textArea.addEventListener("pointerdown", function (e) {
+    if (e.pointerType !== "touch") { return; }
+    touchDrag = true;
+    touchStartY = e.clientY;
+    touchStartScroll = scrollPos;
+    if (textArea.setPointerCapture) { textArea.setPointerCapture(e.pointerId); }
+  });
+  textArea.addEventListener("pointermove", function (e) {
+    if (!touchDrag) { return; }
+    scrollTo(touchStartScroll - (e.clientY - touchStartY));
+  });
+  function endTouchDrag() { touchDrag = false; }
+  textArea.addEventListener("pointerup", endTouchDrag);
+  textArea.addEventListener("pointercancel", endTouchDrag);
 
   /* ========== 6. 音效（Web Audio 合成点击声与说话哔哔声） ========== */
   var audioCtx = null;
