@@ -140,6 +140,10 @@
   function buildBar() {
     if (!document.body || document.getElementById("yetu-lang")) { return; }
 
+    /* 切换条只在首页出现（首页的 script 标签上写了 data-lang-bar="on"）。
+       其它页面按首页选过的语言显示，但不再放按钮。 */
+    if (!scriptEl || scriptEl.getAttribute("data-lang-bar") !== "on") { return; }
+
     /* 页面被别的页面用 iframe 套着显示时（比如电脑桌里的「个人档案」「价格表」），
        不再重复放一个按钮条——外层页面已经有一个，点它两边会同步切换。 */
     if (window.self !== window.top) { return; }

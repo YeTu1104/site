@@ -389,11 +389,11 @@ body {
 
   #bg-image { object-fit: cover; }
 
-  /* 分类按钮：顶部一排等分（下面留出左上角语言切换条的位置） */
+  /* 分类按钮：顶部一排等分 */
   .category-nav {
     left: 4px !important;
     right: 56px !important;
-    top: 50px !important;
+    top: 4px !important;
     bottom: auto !important;
     width: auto !important;
     height: 52px !important;
@@ -416,7 +416,7 @@ body {
   /* 回首页的 X */
   .home-btn {
     right: 4px !important;
-    top: 54px !important;
+    top: 8px !important;
     width: 46px !important;
     height: 41px !important;
   }
@@ -425,7 +425,7 @@ body {
   #canvas-viewport {
     left: 4px !important;
     right: 4px !important;
-    top: 108px !important;
+    top: 62px !important;
     bottom: 44px !important;
     width: auto !important;
     height: auto !important;
@@ -490,7 +490,7 @@ body {
     aspect-ratio: 160 / 145;
   }
   .home-btn {
-    top: 54px !important;
+    top: 8px !important;
     width: 40px !important;
     height: 36px !important;
   }

@@ -49,11 +49,17 @@ const WORKS = {
     },
     // LIVE2D-05
     {
+      thumb: "assets/live2d/suolue-07.webp",
+      full: "assets/live2d/07.mp4",
+      note: "模型师：鱼紫"
+    },
+    // LIVE2D-06
+    {
       thumb: "assets/live2d/suolue-05.webp",
       full: "assets/live2d/05.mp4",
       note: "模型师：缘青青青"
     },
-    // LIVE2D-06
+    // LIVE2D-07
     {
       thumb: "assets/live2d/suolue-08.webp",
       full: "assets/live2d/08.mp4",

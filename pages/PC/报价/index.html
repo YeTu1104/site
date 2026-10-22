@@ -217,6 +217,55 @@
   }
   #pixelIntro #pwdots .d.on { background: #ffd166; }
 
+  /* ============ 非中文时：右侧译文面板（纸上的固定排版不再挤） ============ */
+  #pixelIntro #pwtrans {
+    display: none;
+    position: fixed;
+    box-sizing: border-box;
+    background: #fffdf3;
+    color: #2d2d3a;
+    border: 3px solid #4a4a6a;
+    box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.35);
+    padding: 18px 20px;
+    font-size: 15px;
+    line-height: 1.85;
+    overflow: auto;
+    text-align: left;
+    z-index: 6;
+  }
+  #pixelIntro #pwtrans .tr-title {
+    margin: 0 0 10px;
+    font-size: 17px;
+    line-height: 1.45;
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+  #pixelIntro #pwtrans .tr-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #4a4a55;
+  }
+  #pixelIntro #pwm.lang-alt #pwtrans { display: block; }
+  /* 纸上的中文排版是按 444×463 硬摆的，换成外语就会挤；直接藏掉，只留图 */
+  #pixelIntro #pwm.lang-alt #pwtitle,
+  #pixelIntro #pwm.lang-alt #pwbody { visibility: hidden; }
+  #pixelIntro #pwm.lang-alt #pwpanel { margin-right: min(360px, 32vw); }
+  #pixelIntro #pwm.lang-alt #pwtrans {
+    right: max(10px, 2.5vw);
+    top: 50%;
+    transform: translateY(-50%);
+    width: min(340px, 30vw);
+    max-height: 76vh;
+  }
+  /* 这一页没有图（纯文字），就把译文直接盖在纸上，别留一张白纸在旁边 */
+  #pixelIntro #pwm.lang-alt.no-img #pwpanel { margin-right: 0; }
+  #pixelIntro #pwm.lang-alt.no-img #pwtrans {
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(400px, 34vw);
+  }
+
   /* =========================================================
      响应式：手机 / 竖向小窗口
      桌面端仍是 1176×870 的等比画布（视觉不变）；
@@ -265,6 +314,31 @@
     #pixelIntro .pw-next { right: 50%; margin-right: -72px; }
     #pixelIntro .pw-arrow svg { width: 18px; height: 32px; }
     #pixelIntro #pwdots { top: auto; bottom: -38px; }
+
+    /* 手机：纸张缩到上方，译文面板接在下面，中间那条缝留给翻页箭头 */
+    #pixelIntro #pwm.lang-alt {
+      flex-direction: column;
+      justify-content: flex-start;
+      padding-top: 6px;
+    }
+    #pixelIntro #pwm.lang-alt #pwpanel { margin: 0 0 54px; }
+    /* 手机上不管这页有没有图，译文都接在纸张下面（纸张只当“文件”摆着） */
+    #pixelIntro #pwm.lang-alt #pwtrans,
+    #pixelIntro #pwm.lang-alt.no-img #pwtrans {
+      position: relative;
+      right: auto;
+      left: auto;
+      top: auto;
+      transform: none;
+      width: 94vw;
+      max-height: none;
+      flex: 1 1 auto;
+      margin-bottom: 8px;
+      padding: 14px 16px;
+      font-size: 13px;
+      line-height: 1.75;
+    }
+    #pixelIntro #pwm.lang-alt #pwtrans .tr-title { font-size: 15px; }
   }
 </style>
 </head>
@@ -284,6 +358,10 @@
       <button class="pw-arrow pw-next" type="button" aria-label="下一页"><svg width="22" height="40" viewBox="0 0 12 20" shape-rendering="crispEdges"><polygon points="0,0 12,10 0,20" fill="#fff"/></svg></button>
       <div id="pwdots"></div>
     </div>
+    <aside id="pwtrans" aria-live="polite">
+      <div class="tr-title" id="pwtransTitle"></div>
+      <div class="tr-body" id="pwtransBody"></div>
+    </aside>
   </div>
 </div>
 
@@ -354,6 +432,38 @@
   var prevBtn = document.querySelector('#pixelIntro .pw-prev');
   var nextBtn = document.querySelector('#pixelIntro .pw-next');
   var dots = document.getElementById('pwdots');
+  var transTitle = document.getElementById('pwtransTitle');
+  var transBody = document.getElementById('pwtransBody');
+
+  /* 当前语言不是中文时，走“纸上只留图 + 右侧译文面板”的排版 */
+  function isAltLang() {
+    try {
+      if (window.i18n && typeof window.i18n.lang === 'function') {
+        return window.i18n.lang() !== 'zh';
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function updateTranslation(p) {
+    var alt = isAltLang();
+    var hasImg = !!(p.images && p.images.length);
+
+    mask.classList.toggle('lang-alt', alt);
+    mask.classList.toggle('no-img', alt && !hasImg);
+    if (!alt) {
+      transTitle.textContent = '';
+      transBody.textContent = '';
+      return;
+    }
+
+    transTitle.textContent = (p.title && p.title.text) || '';
+    transBody.textContent = (p.body && p.body.text) || '';
+    /* 面板里的中文交给翻译插件翻（纸上的中文已隐藏，不受影响） */
+    if (window.i18n && window.i18n.refresh) {
+      window.i18n.refresh();
+    }
+  }
 
   var scrollY = 0, maxScroll = 0;
   var curFolder = 0, curPage = 0;
@@ -489,8 +599,13 @@
 
   function sizeModal() {
     var compact = window.matchMedia("(max-width: 640px), (max-aspect-ratio: 1/1)").matches;
-    var maxH = window.innerHeight * (compact ? 0.70 : 0.74);
-    var maxW = window.innerWidth * (compact ? 0.94 : 0.74);
+    /* 小屏 + 外语：纸张让出下半屏给译文面板 */
+    var alt = compact && isAltLang();
+    var pageNow = FOLDERS[curFolder] && FOLDERS[curFolder].pages[curPage];
+    var noImg = alt && !(pageNow && pageNow.images && pageNow.images.length);
+    var paperRatio = alt ? (noImg ? 0.30 : 0.40) : 0.70;
+    var maxH = window.innerHeight * (compact ? paperRatio : 0.74);
+    var maxW = window.innerWidth * (compact ? (alt ? 0.82 : 0.94) : 0.74);
     var h = maxH;
     var w = h * (PAPER_W / PAPER_H);
     if (w > maxW) { w = maxW; h = w * (PAPER_H / PAPER_W); }
@@ -541,6 +656,8 @@
       html += '<span class="d' + (i === curPage ? ' on' : '') + '"></span>';
     }
     dots.innerHTML = html;
+
+    updateTranslation(p);
   }
 
   prevBtn.addEventListener('click', function (e) {

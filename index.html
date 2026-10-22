@@ -653,7 +653,7 @@
   </div>
 
   <!-- ===== 多语言切换：中文 / English / 日本語。用的是现成翻译插件 translate.js，配置在 i18n.js 里 ===== -->
-  <script src="i18n.js" data-lang-pos="tl" data-lang-z="70"></script>
+  <script src="i18n.js" data-lang-bar="on" data-lang-pos="tl" data-lang-z="70"></script>
 
   <!-- ===== 【第3轮新增】本地普通脚本加载交互内容；文件缺失时由内联逻辑提供默认内容 ===== -->
   <script src="interactions.js"></script>
@@ -2689,6 +2689,20 @@
       };
     }
 
+    /* ===== 【新增】个别交互点的亮点手动微调（按作者指的位置），没写的仍用区域重心 ===== */
+    const ZONE_GLOW_POINTS = {
+      PC: { x: 375, y: 828 },     // 电脑桌：床铺左侧那块
+      art_1: { x: 1059, y: 407 }  // 作品集：照片墙上排偏左
+    };
+
+    function zoneGlowPoint(zone) {
+      const custom = zone && ZONE_GLOW_POINTS[zone.id];
+
+      if (custom) return custom;
+
+      return zoneCenter(zone);
+    }
+
     /* ===== 【新增】交互点名字标签：把区域名字贴在对应发光点上方 ===== */
     const zoneLabelLayer = document.getElementById("zone-labels");
     const zoneLabelItems = [];
@@ -2725,10 +2739,18 @@
     function positionZoneLabels() {
       if (!zoneLabelItems.length || !state.map) return;
 
+      // 只有竖屏才把名字贴在交互点上；横屏/桌面只留会呼吸的亮点
+      if (view.width > view.height) {
+        for (const item of zoneLabelItems) {
+          item.el.style.display = "none";
+        }
+        return;
+      }
+
       const gap = view.compact ? 20 : 28;
 
       for (const item of zoneLabelItems) {
-        const center = zoneCenter(item.zone);
+        const center = zoneGlowPoint(item.zone);
         const p = toScreen(center.x, center.y);
         const half = item.el.offsetWidth / 2 || 30;
         const outside =
@@ -2760,31 +2782,59 @@
       const now = performance.now();
       const pulse = 0.5 + 0.5 * Math.sin(now / 420);
 
-      for (const zone of state.map.interactiveZones) {
-        const center = zoneCenter(zone);
+      state.map.interactiveZones.forEach(function (zone, index) {
+        const center = zoneGlowPoint(zone);
         const p = toScreen(center.x, center.y);
-        const radius = 12 + pulse * 5;
+        // 亮点整体放大到原来的两倍左右，并且一圈圈呼吸
+        const radius = 24 + pulse * 10;
 
+        ctx.save();
+
+        // 外层柔光
+        ctx.globalCompositeOperation = "screen";
         const glow = ctx.createRadialGradient(
           p.x, p.y, 0, p.x, p.y, radius
         );
-
-        glow.addColorStop(0, "rgba(255, 240, 170, 0.95)");
-        glow.addColorStop(0.45, "rgba(255, 210, 120, 0.42)");
+        glow.addColorStop(0, "rgba(255, 240, 170, " + (0.7 + pulse * 0.28).toFixed(3) + ")");
+        glow.addColorStop(0.45, "rgba(255, 210, 120, " + (0.3 + pulse * 0.2).toFixed(3) + ")");
         glow.addColorStop(1, "rgba(255, 200, 100, 0)");
-
-        ctx.save();
-        ctx.globalCompositeOperation = "screen";
         ctx.fillStyle = glow;
         ctx.fillRect(p.x - radius, p.y - radius, radius * 2, radius * 2);
 
-        ctx.globalCompositeOperation = "source-over";
-        ctx.fillStyle = "rgba(255, 250, 205, 0.9)";
+        // 贴地的一圈光环，随呼吸缩放（压扁一点才像落在地面上）
+        ctx.strokeStyle = "rgba(255, 238, 170, " + (0.16 + pulse * 0.3).toFixed(3) + ")";
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.ellipse(p.x, p.y, radius * 0.66, radius * 0.66 * 0.58, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 中心那颗会呼吸的小亮核
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "rgba(255, 252, 220, " + (0.76 + pulse * 0.22).toFixed(3) + ")";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4.6 + pulse * 1.6, 0, Math.PI * 2);
         ctx.fill();
+
+        // 环绕的小粒子：贴地面压扁成椭圆，边转边闪
+        ctx.globalCompositeOperation = "screen";
+        const count = 6;
+        const seed = index * 1.7 + String(zone.id || "").length * 0.31;
+
+        for (let i = 0; i < count; i++) {
+          const phase = seed + i * (Math.PI * 2 / count);
+          const angle = now * (0.00052 + i * 0.00007) + phase;
+          const ring = radius * (0.66 + 0.2 * Math.sin(now / 900 + i * 1.3));
+          const px = p.x + Math.cos(angle) * ring;
+          const py = p.y + Math.sin(angle) * ring * 0.58;
+          const twinkle = 0.5 + 0.5 * Math.sin(now / 260 + i * 2.1);
+          const size = 2 + twinkle * 1.6;
+
+          ctx.fillStyle = "rgba(255, 246, 200, " + (0.34 + twinkle * 0.5).toFixed(3) + ")";
+          ctx.fillRect(px - size / 2, py - size / 2, size, size);
+        }
+
         ctx.restore();
-      }
+      });
     }
 
     function render() {
