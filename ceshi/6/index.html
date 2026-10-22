@@ -614,6 +614,61 @@
         padding: 2px 7px 3px;
       }
     }
+
+    /* ===== 【新增】竖屏首页的“滑动屏幕”提示：半透明手势图标，左右摇晃，角色一走动就渐隐 ===== */
+    #swipe-hint {
+      position: fixed;
+      left: 50%;
+      bottom: 8vh;
+      width: 108px;
+      margin-left: -54px;
+      z-index: 55;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.28s ease;
+    }
+
+    #swipe-hint.is-on {
+      opacity: 0.62;
+    }
+
+    /* 摇晃原点取用户标注的红点：图标偏右下（79% / 84%） */
+    #swipe-hint img {
+      display: block;
+      width: 100%;
+      height: auto;
+      transform-origin: 79% 84%;
+      animation: swipe-sway 2.2s ease-in-out infinite;
+      filter:
+        drop-shadow(0 2px 3px rgba(20, 12, 6, 0.55))
+        drop-shadow(0 0 10px rgba(20, 12, 6, 0.32));
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    @keyframes swipe-sway {
+      0%,
+      100% {
+        transform: rotate(-11deg);
+      }
+      50% {
+        transform: rotate(11deg);
+      }
+    }
+
+    @media (max-width: 420px) {
+      #swipe-hint {
+        width: 96px;
+        margin-left: -48px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #swipe-hint img {
+        animation: none;
+        transform: rotate(-8deg);
+      }
+    }
   </style>
   <!-- ===== 【第3轮新增】外部交互样式放在内置样式之后；缺失时自动保留内置样式 ===== -->
   <link rel="stylesheet" href="ui.css" />
@@ -633,6 +688,12 @@
 
     <!-- ===== 【新增】可交互区域的名字标签：一直显示在对应位置上方 ===== -->
     <div id="zone-labels" aria-hidden="true"></div>
+    <!-- ===== 【新增】结束 ===== -->
+
+    <!-- ===== 【新增】竖屏首页的“滑动屏幕”提示：角色第一次走动后渐隐消失 ===== -->
+    <div id="swipe-hint" aria-hidden="true">
+      <img src="swipe-hint.png" alt="" draggable="false" />
+    </div>
     <!-- ===== 【新增】结束 ===== -->
 
     <!-- ===== 【第5轮新增】歌单黑胶唱片遮罩：点歌单出现，点唱片去音乐网站，点空白关闭 ===== -->
@@ -2225,6 +2286,10 @@
       updateViewPosition();
       // ===== 【第X轮修改】结束 =====
 
+      // ===== 【新增】转屏 / 改窗口时重新判断 tap 提示该不该显示 =====
+      refreshSwipeHint();
+      // ===== 【新增】结束 =====
+
       hero.resetTracking();
     }
 
@@ -2590,6 +2655,9 @@
         ? state.pendingZone.stand
         : toWorld(state.mouseX, state.mouseY);
 
+      const beforeX = hero.x;
+      const beforeY = hero.y;
+
       hero.update(
         dt,
         target,
@@ -2597,6 +2665,15 @@
         canWalk,
         state.mode === "FOLLOW"
       );
+
+      // ===== 【新增】只要角色真的被点击带着走动过一次，“滑动屏幕”提示就渐隐退场 =====
+      if (
+        swipeHintShown &&
+        Math.hypot(hero.x - beforeX, hero.y - beforeY) > 0.4
+      ) {
+        hideSwipeHint();
+      }
+      // ===== 【新增】结束 =====
 
       if (hero.blocked) {
         if (state.mode === "GOTO") {
@@ -2774,6 +2851,49 @@
         item.el.style.left = x + "px";
         item.el.style.top = (p.y - gap) + "px";
       }
+    }
+
+    /* ===== 【新增】竖屏首页“滑动屏幕”提示：固定在页面下方，第一次让角色走动后渐隐 ===== */
+    const swipeHintEl = document.getElementById("swipe-hint");
+    let swipeHintShown = false;
+    let swipeHintDismissed = false;
+
+    // 只在竖屏出现：横屏与电脑桌面不需要
+    function swipeHintAllowed() {
+      return (
+        !!swipeHintEl &&
+        view.compact &&
+        view.height > view.width &&
+        state.ready
+      );
+    }
+
+    function showSwipeHint() {
+      if (!swipeHintEl || swipeHintDismissed || !swipeHintAllowed()) return;
+
+      swipeHintShown = true;
+      swipeHintEl.classList.add("is-on");
+    }
+
+    function hideSwipeHint() {
+      if (!swipeHintEl) return;
+
+      swipeHintShown = false;
+      swipeHintDismissed = true;
+      swipeHintEl.classList.remove("is-on");
+    }
+
+    // 切换屏幕方向 / 改窗口大小时跟着开关
+    function refreshSwipeHint() {
+      if (swipeHintDismissed || !swipeHintAllowed()) {
+        if (swipeHintEl) {
+          swipeHintShown = false;
+          swipeHintEl.classList.remove("is-on");
+        }
+        return;
+      }
+
+      showSwipeHint();
     }
 
     function drawZoneGlows() {
@@ -2992,6 +3112,10 @@
 
       // ===== 【新增】地图就绪后生成交互点名字标签 =====
       buildZoneLabels();
+      // ===== 【新增】结束 =====
+
+      // ===== 【新增】竖屏首页：页面下方显示“滑动屏幕”提示 =====
+      showSwipeHint();
       // ===== 【新增】结束 =====
 
       // ===== 【第X轮新增】真实背景尺寸确定后，一次性计算默认缩放并读取已保存倍数 =====
